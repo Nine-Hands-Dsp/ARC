@@ -446,7 +446,8 @@ void InfiniteBowProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     auto state = apvts.copyState();
     state.setProperty ("preset", currentPreset.load(), nullptr);
-    state.setProperty ("uiScale", uiScale.load(), nullptr);
+    if (uiScale.load() > 0.0f)
+        state.setProperty ("uiScale", uiScale.load(), nullptr);   // taille propre à cette instance (sinon : taille par défaut choisie)
     for (int i = 0; i < numLearn; ++i)
         state.setProperty (juce::String ("cc_") + learnDef (i).id, ccMap[i].load(), nullptr);
     state.setProperty ("midiFsToggle", midiFsToggle.load(), nullptr);
@@ -462,7 +463,7 @@ void InfiniteBowProcessor::setStateInformation (const void* data, int sizeInByte
         {
             auto state = juce::ValueTree::fromXml (*xml);
             currentPreset.store (juce::jlimit (0, numFactoryPresets - 1, (int) state.getProperty ("preset", 0)));
-            uiScale.store ((float) (double) state.getProperty ("uiScale", 0.6));
+            uiScale.store ((float) (double) state.getProperty ("uiScale", -1.0));   // absente : taille par défaut choisie
             // assignations MIDI Learn (ancien projet sans ces propriétés : Hold = CC64, le reste non assigné)
             for (int i = 0; i < numLearn; ++i)
                 ccMap[i].store (juce::jlimit (-1, 127, (int) state.getProperty (juce::String ("cc_") + learnDef (i).id, learnDef (i).defaultCC)));

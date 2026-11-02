@@ -128,6 +128,9 @@ public:
 
 private:
     void applyScale (float s);
+    static constexpr int numSizes = 3;  // 60 % (défaut d'origine) / 75 % / 100 %
+    static float sizeScale (int idx);
+    float openScale = -1.0f;            // taille par défaut choisie à l'ouverture (non retenue avec le projet tant qu'inchangée)
     void showContextMenu (int learnIdx);    // learnIdx >= 0 : clic droit sur une commande (MIDI Learn en tête du menu)
     void handleMidiMenu (int r);
     void timerCallback() override;      // accroche le verrou de taille minimale à la fenêtre du DAW

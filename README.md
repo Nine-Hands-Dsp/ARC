@@ -4,6 +4,7 @@ Plugin VST3 (Windows / macOS) et AU (macOS) qui simule un archet électronique :
 sustain infini, attaque en « swell » sans médiator, modes harmoniques, position de l'archet sur la corde.
 Dans le DAW, il apparaît sous le nom **Arc**, fabricant **Studio Wiga**.
 
+v2.7.0 : clic droit > Plugin size > Default size (new windows) : taille par défaut des nouvelles fenêtres au choix, comme dans Octopus
 v2.6.0 : MIDI Learn au clic droit sur chaque commande (Clear MIDI, assignations sauvegardées avec le projet)
 v2.5.1 : plus de "poc" ni de note qui décroche à chaque coup de médiator (la corde virtuelle n'est plus coupée à la réattaque, même note = son continu, autre note = changement sans silence ; pas de double déclenchement ; étouffement confirmé sur 20 ms)
 v2.5.0 : anti-gel v2 (JUCE 8.0.15, caches refaits par le timer, chien de garde, aucun appel à l'hôte depuis le thread audio)
@@ -64,7 +65,9 @@ La note tenue s'épanouit au bout d'environ une seconde vers une harmonique qui 
 
 ### Taille de la fenêtre
 
-Clic droit sur la pédale pour choisir 60 % (par défaut, 614 × 494 px), 75 % ou 100 % (1023 × 823 px), comme Ring Think ; on peut aussi tirer le bord de la fenêtre entre 60 % et 100 %. La fenêtre ne peut pas être plus petite que sa taille par défaut.
+Clic droit sur la pédale > **Plugin size** pour choisir 60 % (taille d'origine, la plus petite), 75 % ou 100 %, comme Ring Think ; la taille par défaut choisie est marquée « (default) ». On peut aussi tirer le bord de la fenêtre entre 60 % et 100 %. La fenêtre ne peut pas être plus petite que 60 %.
+
+**Plugin size > Default size (new windows)** : taille à laquelle s'ouvrent les nouvelles fenêtres du plugin (toutes les instances, comme dans Octopus) ; le choix redimensionne aussi tout de suite la fenêtre ouverte. Une taille changée sur une instance est sauvegardée avec le projet et reprise à la réouverture de cette instance.
 
 ## MIDI
 

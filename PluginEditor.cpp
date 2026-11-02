@@ -1,5 +1,6 @@
 #include "PluginEditor.h"
 #include "BinaryData.h"
+#include "WigaWindowSize.h"
 
 using namespace arcui;
 
@@ -670,14 +671,32 @@ InfiniteBowEditor::InfiniteBowEditor (InfiniteBowProcessor& p)
     minSize.setMaximumSize (maxW, maxH);
 
     setOpaque (true);                           // anti-gel : l'hôte ne redessine jamais ce qui est derrière la fenêtre
-    applyScale (proc.uiScale.load());
+    // taille à l'ouverture : celle sauvegardée avec le projet pour cette instance si elle existe,
+    // sinon celle choisie dans le menu « Default size (new windows) » (commune à toutes les nouvelles fenêtres)
+    const float saved = proc.uiScale.load();
+    if (saved > 0.0f)
+        applyScale (saved);
+    else
+    {
+        const float def = sizeScale (WigaWindowSize::defaultIndex (JucePlugin_Name, numSizes));
+        applyScale (def);
+        openScale = def;
+        proc.uiScale.store (-1.0f);             // pas de taille propre à l'instance tant qu'on ne la change pas
+    }
     panel.initCaches();
     startTimer (250);
+}
+
+float InfiniteBowEditor::sizeScale (int idx)
+{
+    const float sizes[numSizes] = { 0.6f, 0.75f, 1.0f };
+    return sizes[juce::jlimit (0, numSizes - 1, idx)];
 }
 
 void InfiniteBowEditor::applyScale (float s)
 {
     s = juce::jlimit (0.6f, 1.0f, s);           // jamais plus petit que la taille par défaut
+    openScale = -1.0f;                          // taille choisie : retenue avec le projet
     proc.uiScale.store (s);
     const float total = baseScale * s;
     setSize (juce::roundToInt ((float) imgW * total), juce::roundToInt ((float) imgH * total));
@@ -697,7 +716,7 @@ void InfiniteBowEditor::resized()
     panel.setTransform (juce::AffineTransform::scale (baseScale * s));
     panel.editorResized();                      // anti-gel v2 : jamais de calcul lourd ici, le timer refait le cache
 
-    if (s >= 0.6f - 0.002f)
+    if (s >= 0.6f - 0.002f && ! (proc.uiScale.load() < 0.0f && std::abs (s - openScale) < 0.005f))
         proc.uiScale.store (juce::jlimit (0.6f, 1.0f, s));   // taille retenue avec le projet
 }
 
@@ -836,12 +855,21 @@ void InfiniteBowEditor::showContextMenu (int learnIdx)
         m.addSeparator();
     }
 
-    const float cur = proc.uiScale.load();
-    m.addSectionHeader ("Window size");
-    const float sizes[] = { 0.6f, 0.75f, 1.0f };
-    const char* labels[] = { "60 % (default)", "75 %", "100 %" };
-    for (int i = 0; i < 3; ++i)
-        m.addItem (i + 1, labels[i], true, std::abs (cur - sizes[i]) < 0.01f);
+    const float cur = (float) getHeight() / ((float) imgH * baseScale);   // taille actuelle de la fenêtre
+    {
+        // Plugin size : taille de cette fenêtre + taille par défaut des nouvelles fenêtres (comme Octopus)
+        const char* labels[numSizes] = { "60 %", "75 %", "100 %" };
+        const int def = WigaWindowSize::defaultIndex (JucePlugin_Name, numSizes);
+        juce::PopupMenu sizes, defSizes;
+        for (int i = 0; i < numSizes; ++i)
+        {
+            sizes.addItem (i + 1, juce::String (labels[i]) + (i == def ? "  (default)" : ""), true, std::abs (cur - sizeScale (i)) < 0.01f);
+            defSizes.addItem (20 + i, labels[i], true, i == def);
+        }
+        sizes.addSeparator();
+        sizes.addSubMenu ("Default size (new windows)", defSizes);
+        m.addSubMenu ("Plugin size", sizes);
+    }
     m.addSeparator();
 
     juce::PopupMenu midi;
@@ -857,10 +885,15 @@ void InfiniteBowEditor::showContextMenu (int learnIdx)
     m.addSubMenu ("MIDI", midi);
 
     m.showMenuAsync (juce::PopupMenu::Options().withMousePosition(),
-                     [safe = juce::Component::SafePointer<InfiniteBowEditor> (this), sizes] (int r)
+                     [safe = juce::Component::SafePointer<InfiniteBowEditor> (this)] (int r)
                      {
                          if (safe == nullptr || r <= 0) return;
-                         if (r <= 3) safe->applyScale (sizes[r - 1]);
+                         if (r <= numSizes) safe->applyScale (sizeScale (r - 1));
+                         else if (r >= 20 && r < 20 + numSizes)
+                         {
+                             WigaWindowSize::setDefaultIndex (JucePlugin_Name, r - 20);   // toutes les nouvelles fenêtres de ce plugin
+                             safe->applyScale (sizeScale (r - 20));                       // et cette fenêtre tout de suite
+                         }
                          else if (r >= 1000) safe->handleMidiMenu (r);
                      });
 }
