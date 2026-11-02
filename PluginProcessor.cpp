@@ -447,7 +447,9 @@ void InfiniteBowProcessor::getStateInformation (juce::MemoryBlock& destData)
     auto state = apvts.copyState();
     state.setProperty ("preset", currentPreset.load(), nullptr);
     if (uiScale.load() > 0.0f)
-        state.setProperty ("uiScale", uiScale.load(), nullptr);   // taille propre à cette instance (sinon : taille par défaut choisie)
+        state.setProperty ("uiScale", uiScale.load(), nullptr);   // taille propre à cette instance
+    else
+        state.removeProperty ("uiScale", nullptr);                // sinon : taille par défaut choisie
     for (int i = 0; i < numLearn; ++i)
         state.setProperty (juce::String ("cc_") + learnDef (i).id, ccMap[i].load(), nullptr);
     state.setProperty ("midiFsToggle", midiFsToggle.load(), nullptr);
