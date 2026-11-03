@@ -409,7 +409,7 @@ void ArcPanel::paint (juce::Graphics& g)
         drawLed (g, { ledPreset[i].x, ledPreset[i].y }, ledPreset[i].lens, ledPreset[i].bezel,
                  i < 4 ? orange : ledCyan, i == cur ? 1.0f : 0.0f);
 
-    // footswitches : BOW respire avec la corde, HOLD (bouton ou pédale CC64)
+    // footswitches : BOW respire avec la corde, HOLD (bouton ou commande MIDI apprise)
     const bool bowOn  = proc.apvts.getRawParameterValue ("bow")->load() > 0.5f;
     const bool holdOn = proc.apvts.getRawParameterValue ("hold")->load() > 0.5f || proc.midiHold.load();
     drawLed (g, { ledBow.x, ledBow.y }, ledBow.lens, ledBow.bezel, orange,
@@ -878,7 +878,7 @@ void InfiniteBowEditor::showContextMenu (int learnIdx)
                       true, lt == i);
     midi.addSeparator();
     if (lt >= 0) midi.addItem (1200, "Cancel MIDI learn");
-    midi.addItem (1201, "Reset MIDI to defaults (CC 64 = Hold)");
+    midi.addItem (1201, "Clear all MIDI assignments");
     midi.addSeparator();
     midi.addItem (1210, "MIDI footswitches latching (127 = on / 0 = off)", true, ! proc.midiFsToggle.load());
     midi.addItem (1211, "MIDI footswitches momentary (toggle each press)", true, proc.midiFsToggle.load());

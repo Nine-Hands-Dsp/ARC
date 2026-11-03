@@ -4,6 +4,7 @@ Plugin VST3 (Windows / macOS) et AU (macOS) qui simule un archet électronique :
 sustain infini, attaque en « swell » sans médiator, modes harmoniques, position de l'archet sur la corde.
 Dans le DAW, il apparaît sous le nom **Arc**, fabricant **Studio Wiga**.
 
+v2.7.1 : plus aucun CC MIDI assigné par défaut (tout passe par le MIDI Learn)
 v2.7.0 : clic droit > Plugin size > Default size (new windows) : taille par défaut des nouvelles fenêtres au choix, comme dans Octopus
 v2.6.0 : MIDI Learn au clic droit sur chaque commande (Clear MIDI, assignations sauvegardées avec le projet)
 v2.5.1 : plus de "poc" ni de note qui décroche à chaque coup de médiator (la corde virtuelle n'est plus coupée à la réattaque, même note = son continu, autre note = changement sans silence ; pas de double déclenchement ; étouffement confirmé sur 20 ms)
@@ -48,7 +49,7 @@ Un double-clic sur un potard le remet à sa valeur par défaut.
 | NORMAL / HARM / HARM+ | Seule la voix choisie est allumée |
 | PRESETS 1-8 | Seul le preset chargé est allumé (orange pour 1-4, cyan pour 5-8) |
 | BOW | Allumée quand l'archet est posé ; sa luminosité suit le son de la corde |
-| HOLD | Allumée quand HOLD est actif, par le footswitch ou la pédale de sustain MIDI (CC64) |
+| HOLD | Allumée quand HOLD est actif, par le footswitch ou une commande MIDI apprise (MIDI Learn) |
 
 ### Bends et vibrato
 
@@ -72,8 +73,8 @@ Clic droit sur la pédale > **Plugin size** pour choisir 60 % (taille d'origine,
 ## MIDI
 
 - Les 13 réglages, VOICE, MODE (« Knob Mode »), BOW, HOLD et Feedback sont automatisables et assignables séparément en MIDI dans le DAW.
-- La pédale de sustain (CC64) active HOLD tant qu'elle est enfoncée (assignation par défaut du MIDI Learn, réassignable).
-- **MIDI Learn** : clic droit sur une commande (potard, MODE, VOICE, preset, BOW, HOLD) -> « MIDI Learn », puis bouger la pédale ou appuyer sur le footswitch MIDI. « Clear MIDI » retire l'assignation ; le sous-menu MIDI liste toutes les commandes, « Reset MIDI to defaults » et le mode des footswitches MIDI (127/0 ou bascule à chaque appui). Les assignations sont sauvegardées avec le projet.
+- Aucun CC assigné par défaut : clic droit > MIDI > Learn (par ex. apprendre la pédale de sustain sur HOLD : HOLD actif tant qu'elle est enfoncée).
+- **MIDI Learn** : clic droit sur une commande (potard, MODE, VOICE, preset, BOW, HOLD) -> « MIDI Learn », puis bouger la pédale ou appuyer sur le footswitch MIDI. « Clear MIDI » retire l'assignation ; le sous-menu MIDI liste toutes les commandes, « Clear all MIDI assignments » (efface toutes les assignations) et le mode des footswitches MIDI (127/0 ou bascule à chaque appui). Les assignations sont sauvegardées avec le projet.
 
 ## Conseils de jeu
 

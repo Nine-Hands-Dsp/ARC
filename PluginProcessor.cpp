@@ -42,7 +42,7 @@ const InfiniteBowProcessor::LearnDef& InfiniteBowProcessor::learnDef (int i)
         { "mode",     "Voice",           -1, learnSelector,   3 },   // 0-42 Normal, 43-85 Harmonic, 86-127 Harmonic+
         { "preset",   "Preset",          -1, learnSelector,   numFactoryPresets },   // CC réparti sur les 8 presets
         { "bow",      "Bow footswitch",  -1, learnFootswitch, 0 },
-        { "hold",     "Hold footswitch", 64, learnFootswitch, 0 },   // CC64 (sustain) = Hold, comme avant
+        { "hold",     "Hold footswitch", -1, learnFootswitch, 0 },   // aucun CC par défaut depuis v2.7.1 (avant : CC64)
     };
     return defs[juce::jlimit (0, numLearn - 1, i)];
 }
@@ -222,7 +222,7 @@ void InfiniteBowProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
     for (int ch = numIn; ch < numOut; ++ch)
         buffer.clear (ch, 0, n);
 
-    // --- MIDI : commandes apprises (MIDI Learn), CC64 = Hold par défaut, affichage du dernier CC ---
+    // --- MIDI : commandes apprises (MIDI Learn, aucun CC par défaut), affichage du dernier CC ---
     // anti-gel v2 : simples valeurs atomiques et file lue par le timer, aucun appel à l'hôte depuis le thread audio
     handleMidi (midi);
 
@@ -375,7 +375,7 @@ void InfiniteBowProcessor::handleMidi (const juce::MidiBuffer& midi)
                 prev = v;
                 if (i == learnHold)
                 {
-                    // Hold MIDI = pédale de sustain (comme le CC64 d'avant), ajouté au bouton HOLD
+                    // Hold MIDI (ex. pédale de sustain apprise), ajouté au bouton HOLD
                     if (! toggleFs)  midiHold.store (v >= 64);
                     else if (press)  midiHold.store (! midiHold.load());
                 }
@@ -466,9 +466,16 @@ void InfiniteBowProcessor::setStateInformation (const void* data, int sizeInByte
             auto state = juce::ValueTree::fromXml (*xml);
             currentPreset.store (juce::jlimit (0, numFactoryPresets - 1, (int) state.getProperty ("preset", 0)));
             uiScale.store ((float) (double) state.getProperty ("uiScale", -1.0));   // absente : taille par défaut choisie
-            // assignations MIDI Learn (ancien projet sans ces propriétés : Hold = CC64, le reste non assigné)
+            // assignations MIDI Learn (ancien projet sans ces propriétés : ancienne table d'usine Hold = CC64, le reste non assigné)
+            constexpr int oldFactoryHoldCC = 64;   // table d'usine < 2.7.1
+            bool untouched = true;
             for (int i = 0; i < numLearn; ++i)
-                ccMap[i].store (juce::jlimit (-1, 127, (int) state.getProperty (juce::String ("cc_") + learnDef (i).id, learnDef (i).defaultCC)));
+            {
+                const int oldDef = i == learnHold ? oldFactoryHoldCC : -1;
+                ccMap[i].store (juce::jlimit (-1, 127, (int) state.getProperty (juce::String ("cc_") + learnDef (i).id, oldDef)));
+                untouched = untouched && ccMap[i].load() == oldDef;
+            }
+            if (untouched) resetMidiMap();   // ancienne table d'usine jamais modifiée -> plus aucune assignation
             midiFsToggle.store ((bool) state.getProperty ("midiFsToggle", false));
             apvts.replaceState (state);
         }
