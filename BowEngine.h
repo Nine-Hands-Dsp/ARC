@@ -1,5 +1,5 @@
 // =============================================================================
-//  Infinite Bow (Studio Wiga) - moteur DSP
+//  Infinite Bow (NINE HANDS | DSP) - moteur DSP
 //  Simulation d'un archet électronique :
 //   1. suivi de hauteur monophonique (YIN) et détection d'attaque / d'étouffement
 //   2. corde virtuelle (guide d'onde) accordée sur la note jouée, excitée par la

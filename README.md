@@ -1,8 +1,8 @@
-# ARC (Studio Wiga)
+# ARC (NINE HANDS | DSP)
 
 Plugin VST3 (Windows / macOS) et AU (macOS) qui simule un archet électronique :
 sustain infini, attaque en « swell » sans médiator, modes harmoniques, position de l'archet sur la corde.
-Dans le DAW, il apparaît sous le nom **Arc**, fabricant **Studio Wiga**.
+Dans le DAW, il apparaît sous le nom **Arc**, fabricant **NINE HANDS | DSP**.
 
 v2.7.1 : plus aucun CC MIDI assigné par défaut (tout passe par le MIDI Learn)
 v2.7.0 : clic droit > Plugin size > Default size (new windows) : taille par défaut des nouvelles fenêtres au choix, comme dans Octopus

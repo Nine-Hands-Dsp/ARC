@@ -1,4 +1,4 @@
-# ARC (Studio Wiga) - notice PDF bilingue (partie anglaise complete, puis partie francaise complete).
+# ARC (NINE HANDS | DSP) - notice PDF bilingue (partie anglaise complete, puis partie francaise complete).
 # Usage : python3 tools/manual.py [fichier PDF de sortie]   (defaut : docs/ARC_Manual_EN-FR_v<VERSION>.pdf)
 # Illustrations : tools/manual_assets/ (rendus reels du plugin et courbes mesurees sur le moteur, repris de la notice 2.6.0 ;
 # aucune ne montre le menu clic droit). Polices : assets/fonts (Poppins, DejaVu Sans pour les symboles).
@@ -7,12 +7,12 @@ import re as _re, os as _os
 VERSION = _re.search(r"project\(\w+ VERSION ([0-9.]+)", open(_os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "CMakeLists.txt")).read()).group(1)   # version du plugin
 NAME = "ARC"
 TITLE = "ARC"
-FOOTER = {"en": "ARC (Studio Wiga) · v" + VERSION, "fr": "ARC (Studio Wiga) · v" + VERSION}
+FOOTER = {"en": "ARC (NINE HANDS | DSP) · v" + VERSION, "fr": "ARC (NINE HANDS | DSP) · v" + VERSION}
 from reportlab.lib import colors
 ACC = colors.HexColor("#E8822E")
 H1COL = ACC; H2COL = colors.HexColor("#1B1D22")
 HCELLBG = colors.HexColor("#F4F1EC"); HCELLTXT = colors.HexColor("#1B1D22")
-# ---------- mise en page commune (style maison Studio Wiga) ----------
+# ---------- mise en page commune (style maison NINE HANDS | DSP) ----------
 import os, sys
 from PIL import Image
 from reportlab.lib.pagesizes import A4
@@ -91,7 +91,7 @@ def cover(t, cover_img, cover_w):
 
 def build(sections, title):
     doc = BaseDocTemplate(OUT, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=17 * mm, bottomMargin=18 * mm,
-                          title=title, author="Studio Wiga")
+                          title=title, author="NINE HANDS | DSP")
     lang = {"v": "en"}
     def deco(c, d):
         c.saveState()
@@ -143,7 +143,7 @@ T = {
  ins_t="2. Installation",
  ins=[("Windows", "Copy <b>Arc.vst3</b> (artifact <b>Arc-Windows-VST3</b>) into <b>C:\\Program Files\\Common Files\\VST3\\</b>, then rescan the plugins in your DAW."),
       ("macOS", "From the artifact <b>Arc-macOS-VST3-AU</b> (universal binary, Apple Silicon and Intel), copy <b>Arc.vst3</b> into <b>~/Library/Audio/Plug-Ins/VST3/</b> and <b>Arc.component</b> (Audio Unit) into <b>~/Library/Audio/Plug-Ins/Components/</b>. The plugin is not notarized: if macOS blocks it, run <b>xattr -cr</b> followed by the plugin path in Terminal."),
-      ("Reaper", "Options &gt; Preferences &gt; Plug-ins &gt; VST &gt; <b>Re-scan</b>. ARC is listed as <b>Arc</b> by <b>Studio Wiga</b>. To control it from a MIDI pedal board, record-arm the track with your MIDI input (or use a MIDI send) so the plugin receives MIDI.")],
+      ("Reaper", "Options &gt; Preferences &gt; Plug-ins &gt; VST &gt; <b>Re-scan</b>. ARC is listed as <b>Arc</b> by <b>NINE HANDS | DSP</b>. To control it from a MIDI pedal board, record-arm the track with your MIDI input (or use a MIDI send) so the plugin receives MIDI.")],
  ov_t="3. Interface overview",
  ov=[["#", "Control", "#", "Control"], ["1", "ATTACK / RELEASE", "8", "MODE button and LED"], ["2", "SUSTAIN / SENS", "9", "VOICE selector (NORMAL, HARM, HARM+)"],
      ["3", "POSITION / BUZZ", "10", "Status line"], ["4", "TONE", "11", "String display"], ["5", "LIFE / GLIDE", "12", "Presets 1–8"],
@@ -211,9 +211,9 @@ T = {
  sc=[("status_cc.png", "A setting and the last CC received"), ("status_learn.png", "MIDI Learn waiting for a CC"),
      ("status_assigned.png", "Assignment confirmed (2 s)"), ("status_hold.png", "HOLD engaged by MIDI (here a sustain pedal learned on Hold)")],
  w_t="7. Window",
- w=["ARC opens at its default size, <b>60 %</b> at first, the same default size as Ring Think and the other Studio Wiga pedals, and the window can never be made smaller than 60 %, even if your DAW tries to resize it.",
+ w=["ARC opens at its default size, <b>60 %</b> at first, the same default size as Ring Think and the other NINE HANDS | DSP pedals, and the window can never be made smaller than 60 %, even if your DAW tries to resize it.",
     "Right-click the pedal &gt; <b>Plugin size</b>: <b>60 %</b>, <b>75 %</b> or <b>100 %</b> (the current size is ticked); <i>(default)</i> is shown next to the default size. You can also drag the window edge anywhere between 60 % and 100 %; the pedal keeps its proportions.",
-    "<b>Plugin size &gt; Default size (new windows)</b> chooses the size at which every new ARC window opens. This setting is common to all instances and saved on your computer (<i>settings.xml</i> in the Studio Wiga\\Arc folder of your user data: %APPDATA% on Windows, ~/Library on macOS); the open window takes that size at once.",
+    "<b>Plugin size &gt; Default size (new windows)</b> chooses the size at which every new ARC window opens. This setting is common to all instances and saved on your computer (<i>settings.xml</i> in the NINE HANDS | DSP\\Arc folder of your user data: %APPDATA% on Windows, ~/Library on macOS); the open window takes that size at once.",
     "A size chosen for an instance (from the menu or by dragging the edge) is remembered with its project and stays the priority for that instance when the project is reopened. An instance whose size was never changed is not tied to a size: it always opens at the current default size."],
  pr_t="8. Presets",
  pr="Click a preset LED (or its number) to load it. Your DAW also sees the 8 presets as programs with their names. To keep your own settings, save the plugin state in your DAW. All presets use SUSTAIN Infinite, SENS −45 dB and OUTPUT 0 dB.",
@@ -259,7 +259,7 @@ T = {
      ["My MIDI pedal does nothing", "No CC is assigned by default: learn it (right-click the control &gt; MIDI Learn). Check that the DAW sends MIDI to the plugin and watch the status line (last CC received)."],
      ["A MIDI footswitch needs two presses", "Choose “MIDI footswitches momentary (toggle each press)” in the MIDI sub-menu."]],
  sp_t="10. Technical specifications",
- sp=[["Formats", "VST3 (Windows 64-bit, macOS), AU (macOS), universal Apple Silicon + Intel; listed as “Arc” by “Studio Wiga”"],
+ sp=[["Formats", "VST3 (Windows 64-bit, macOS), AU (macOS), universal Apple Silicon + Intel; listed as “Arc” by “NINE HANDS | DSP”"],
      ["Channels", "Mono or stereo in, mono or stereo out; MIDI input"], ["Sample rates", "44.1 to 192 kHz"], ["Latency", "0 samples"],
      ["Tracking", "Monophonic, about 48 Hz (G#1) to 1.4 kHz"], ["CPU", "About 3 % of one core for the bow engine (measured offline)"],
      ["Parameters", "18, all automatable (13 settings, Voice, Knob Mode, Bow, Hold, Feedback)"],
@@ -284,7 +284,7 @@ T = {
  ins_t="2. Installation",
  ins=[("Windows", "Copiez <b>Arc.vst3</b> (artefact <b>Arc-Windows-VST3</b>) dans <b>C:\\Program Files\\Common Files\\VST3\\</b>, puis relancez le scan des plugins du DAW."),
       ("macOS", "Depuis l'artefact <b>Arc-macOS-VST3-AU</b> (binaire universel, Apple Silicon et Intel), copiez <b>Arc.vst3</b> dans <b>~/Library/Audio/Plug-Ins/VST3/</b> et <b>Arc.component</b> (Audio Unit) dans <b>~/Library/Audio/Plug-Ins/Components/</b>. Le plugin n'est pas notarié : si macOS le bloque, lancez dans le Terminal <b>xattr -cr</b> suivi du chemin du plugin."),
-      ("Reaper", "Options &gt; Preferences &gt; Plug-ins &gt; VST &gt; <b>Re-scan</b>. ARC apparaît sous le nom <b>Arc</b>, fabricant <b>Studio Wiga</b>. Pour le piloter depuis un pédalier MIDI, armez la piste avec votre entrée MIDI (ou utilisez un envoi MIDI) afin que le plugin reçoive le MIDI.")],
+      ("Reaper", "Options &gt; Preferences &gt; Plug-ins &gt; VST &gt; <b>Re-scan</b>. ARC apparaît sous le nom <b>Arc</b>, fabricant <b>NINE HANDS | DSP</b>. Pour le piloter depuis un pédalier MIDI, armez la piste avec votre entrée MIDI (ou utilisez un envoi MIDI) afin que le plugin reçoive le MIDI.")],
  ov_t="3. Vue d'ensemble de l'interface",
  ov=[["#", "Commande", "#", "Commande"], ["1", "ATTACK / RELEASE", "8", "Bouton MODE et sa LED"], ["2", "SUSTAIN / SENS", "9", "Sélecteur VOICE (NORMAL, HARM, HARM+)"],
      ["3", "POSITION / BUZZ", "10", "Ligne d'état"], ["4", "TONE", "11", "Écran de corde"], ["5", "LIFE / GLIDE", "12", "Presets 1 à 8"],
@@ -352,9 +352,9 @@ T = {
  sc=[("status_cc.png", "Un réglage et le dernier CC reçu"), ("status_learn.png", "MIDI Learn en attente d'un CC"),
      ("status_assigned.png", "Assignation confirmée (2 s)"), ("status_hold.png", "HOLD tenu par le MIDI (ici une pédale de sustain apprise sur Hold)")],
  w_t="7. Fenêtre",
- w=["ARC s'ouvre à sa taille par défaut, <b>60 %</b> au départ, la même taille par défaut que Ring Think et les autres pédales Studio Wiga, et la fenêtre ne peut jamais être plus petite que 60 %, même si le DAW tente de la réduire.",
+ w=["ARC s'ouvre à sa taille par défaut, <b>60 %</b> au départ, la même taille par défaut que Ring Think et les autres pédales NINE HANDS | DSP, et la fenêtre ne peut jamais être plus petite que 60 %, même si le DAW tente de la réduire.",
     "Clic droit sur la pédale &gt; <b>Plugin size</b> : <b>60 %</b>, <b>75 %</b> ou <b>100 %</b> (la taille actuelle est cochée) ; <i>(default)</i> est indiqué à côté de la taille par défaut. Vous pouvez aussi tirer le bord de la fenêtre entre 60 % et 100 % ; la pédale garde ses proportions.",
-    "<b>Plugin size &gt; Default size (new windows)</b> choisit la taille d'ouverture de toutes les nouvelles fenêtres d'ARC. Ce réglage est commun à toutes les instances et enregistré sur l'ordinateur (<i>settings.xml</i> dans le dossier Studio Wiga\\Arc des données utilisateur : %APPDATA% sous Windows, ~/Library sous macOS) ; la fenêtre ouverte prend aussi cette taille tout de suite.",
+    "<b>Plugin size &gt; Default size (new windows)</b> choisit la taille d'ouverture de toutes les nouvelles fenêtres d'ARC. Ce réglage est commun à toutes les instances et enregistré sur l'ordinateur (<i>settings.xml</i> dans le dossier NINE HANDS | DSP\\Arc des données utilisateur : %APPDATA% sous Windows, ~/Library sous macOS) ; la fenêtre ouverte prend aussi cette taille tout de suite.",
     "Une taille choisie pour une instance (par le menu ou en tirant le bord) est mémorisée avec son projet et reste prioritaire pour cette instance à la réouverture du projet. Une instance dont la taille n'a jamais été changée n'est liée à aucune taille : elle s'ouvre toujours à la taille par défaut du moment."],
  pr_t="8. Presets",
  pr="Cliquez sur une LED de preset (ou son numéro) pour le charger. Le DAW voit aussi les 8 presets comme des programmes, avec leur nom. Pour garder vos réglages, enregistrez l'état du plugin dans le DAW. Tous les presets utilisent SUSTAIN Infinite, SENS −45 dB et OUTPUT 0 dB.",
@@ -400,7 +400,7 @@ T = {
      ["Ma pédale MIDI ne fait rien", "Aucun CC n'est assigné par défaut : apprenez-le (clic droit sur la commande &gt; MIDI Learn). Vérifiez que le DAW envoie le MIDI au plugin et regardez la ligne d'état (dernier CC reçu)."],
      ["Un footswitch MIDI demande deux appuis", "Choisissez « MIDI footswitches momentary (toggle each press) » dans le sous-menu MIDI."]],
  sp_t="10. Caractéristiques techniques",
- sp=[["Formats", "VST3 (Windows 64 bits, macOS), AU (macOS), universel Apple Silicon + Intel ; listé « Arc », fabricant « Studio Wiga »"],
+ sp=[["Formats", "VST3 (Windows 64 bits, macOS), AU (macOS), universel Apple Silicon + Intel ; listé « Arc », fabricant « NINE HANDS | DSP »"],
      ["Canaux", "Entrée mono ou stéréo, sortie mono ou stéréo ; entrée MIDI"], ["Fréquences", "44,1 à 192 kHz"], ["Latence", "0 échantillon"],
      ["Suivi de note", "Monophonique, d'environ 48 Hz (Sol#1) à 1,4 kHz"], ["Processeur", "Environ 3 % d'un cœur pour le moteur d'archet (mesuré hors DAW)"],
      ["Paramètres", "18, tous automatisables (13 réglages, Voice, Knob Mode, Bow, Hold, Feedback)"],

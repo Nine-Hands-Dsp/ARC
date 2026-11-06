@@ -6,7 +6,7 @@
 #include "WindowMinSize.h"
 
 //==============================================================================
-//  ARC (Studio Wiga) - interface sur le visuel de la pédale
+//  ARC (NINE HANDS | DSP) - interface sur le visuel de la pédale
 //  Toutes les coordonnées sont celles du visuel (1525 x 1227 px, même taille de pédale que Ring Think).
 //==============================================================================
 namespace arcui

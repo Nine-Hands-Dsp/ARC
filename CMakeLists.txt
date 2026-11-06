@@ -31,7 +31,7 @@ if(APPLE)
 endif()
 
 juce_add_plugin(Arc
-    COMPANY_NAME                "Studio Wiga"
+    COMPANY_NAME                "NINE HANDS | DSP"
     PRODUCT_NAME                "Arc"
     PLUGIN_MANUFACTURER_CODE    Wiga
     PLUGIN_CODE                 ArcB

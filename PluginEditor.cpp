@@ -421,7 +421,7 @@ void ArcPanel::paint (juce::Graphics& g)
     g.setFont (mono (25.0f));
     g.drawText (statusText(), lcdRect.reduced (16.0f, 0.0f), juce::Justification::centred, true);
 
-    drawDisplay (g);     // le logo Studio Wiga fait partie du visuel
+    drawDisplay (g);     // le logo NINE HANDS | DSP fait partie du visuel
 
     // (le nom du preset n'est plus affiché sur la pédale : il reste visible dans le DAW)
 }
@@ -725,7 +725,7 @@ void InfiniteBowEditor::resized()
 // Avec certains pilotes (Intel notamment) la fenêtre du plugin cesse de se rafraîchir alors que
 // le DAW continue de tourner. Le moteur logiciel est stable partout et largement assez rapide ici.
 //==============================================================================
-// Anti-gel v2 (Studio Wiga) :
+// Anti-gel v2 (NINE HANDS | DSP) :
 //  1. moteur de rendu logiciel forcé sur Windows (Direct2D peut figer la fenêtre dans certains hôtes),
 //     appliqué à chaque nouvelle fenêtre hôte (peer) et revérifié toutes les secondes, jamais en boucle ;
 //  2. aucun calcul lourd dans paint() : le fond réduit à la taille de l'écran est refait par le timer seulement,
