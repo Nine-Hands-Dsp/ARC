@@ -10,6 +10,13 @@ v2.6.0 : MIDI Learn au clic droit sur chaque commande (Clear MIDI, assignations 
 v2.5.1 : plus de "poc" ni de note qui décroche à chaque coup de médiator (la corde virtuelle n'est plus coupée à la réattaque, même note = son continu, autre note = changement sans silence ; pas de double déclenchement ; étouffement confirmé sur 20 ms)
 v2.5.0 : anti-gel v2 (JUCE 8.0.15, caches refaits par le timer, chien de garde, aucun appel à l'hôte depuis le thread audio)
 
+<p align="center">
+  <a href="https://github.com/Nine-Hands-Dsp/ARC/releases/latest/download/Arc-VST3-Windows.zip"><img alt="Télécharger pour Windows" src="https://img.shields.io/badge/%E2%AC%87%20T%C3%A9l%C3%A9charger-Windows-0078D6?style=for-the-badge"></a>
+  <a href="https://github.com/Nine-Hands-Dsp/ARC/releases/latest/download/Arc-VST3-macOS.zip"><img alt="Télécharger pour macOS" src="https://img.shields.io/badge/%E2%AC%87%20T%C3%A9l%C3%A9charger-macOS-111111?style=for-the-badge&logo=apple&logoColor=white"></a>
+  <br>
+  <a href="https://github.com/Nine-Hands-Dsp/ARC/releases/latest"><img alt="Dernière version" src="https://img.shields.io/github/v/release/Nine-Hands-Dsp/ARC?label=derni%C3%A8re%20version&color=919496"></a>
+</p>
+
 ## Principe
 
 1. **Suivi de la note** : le plugin détecte la hauteur de la note jouée (YIN, monophonique), les attaques et les étouffements.
