@@ -117,7 +117,7 @@ metal = cv2.resize(red2, (W, H), interpolation=cv2.INTER_AREA)
 metal = np.clip(metal, 0, 1) * body_a
 plate = np.clip(body_a - metal, 0, 1)
 
-# ---- contour : aluminium brosse (texture fournie, assets/kit/brushed_alu_4096.png, reduite de moitie) + leger bevel
+# ---- contour : aluminium microbille (texture fournie) + leger bevel
 dout = cv2.distanceTransform((body_a > 0.5).astype(np.uint8), cv2.DIST_L2, cv2.DIST_MASK_PRECISE).astype(np.float32)
 dout = dout + (body_a - 0.5)                                   # sous-pixel au bord exterieur
 din = cv2.distanceTransform((metal > 0.5).astype(np.uint8), cv2.DIST_L2, cv2.DIST_MASK_PRECISE).astype(np.float32)
@@ -132,17 +132,15 @@ ndl = np.clip((nrm * LB).sum(2), 0, 1)
 half = LB + np.array([0, 0, 1.0]); half /= np.linalg.norm(half)
 spec = np.clip((nrm * half).sum(2), 0, 1) ** 30
 grain = cv2.GaussianBlur(rng.normal(0, 1, (H, W)).astype(np.float32), (0, 0), 0.6)
-tex = np.asarray(Image.open(os.path.join(KIT, 'brushed_alu_4096.png')).convert('RGB')).astype(np.float32)
-tex = cv2.resize(tex, (2048, 2048), interpolation=cv2.INTER_AREA)          # reduction seulement (jamais d'agrandissement)
+# texture du contour : alu microbille (assets/kit/sandblasted_alu_1024.png), sans direction -> pavage en miroir
+# (raccords invisibles, aucune mise a l'echelle : 1 px de texture = 1 px de l'image)
+tex = np.asarray(Image.open(os.path.join(KIT, 'sandblasted_alu_1024.png')).convert('RGB')).astype(np.float32)
 TS = tex.shape[0]
-ix, iy = (xx.astype(np.int32) % TS), (yy.astype(np.int32) % TS)
-tex_h = tex[iy, ix]                                                          # stries horizontales (haut / bas)
-tex_v = tex[ix, iy]                                                          # meme texture tournee d'un quart de tour (cotes)
-gyo, gxo = np.gradient(cv2.GaussianBlur(dout, (0, 0), 6.0))
-wh = gyo ** 2 / np.maximum(gxo ** 2 + gyo ** 2, 1e-6)
-wh = cv2.GaussianBlur(wh.astype(np.float32), (0, 0), 10.0)[..., None]
-alu = tex_h * wh + tex_v * (1 - wh)
-alu = alu * (np.array([0.985, 0.99, 1.02]) * (196.0 / 157.0) * 0.86)        # teinte du contour d'origine
+def refl(i):
+    i = i % (2 * TS)
+    return np.where(i < TS, i, 2 * TS - 1 - i)
+alu = tex[refl(yy.astype(np.int32)), refl(xx.astype(np.int32))]
+alu = alu * (np.array([0.985, 0.99, 1.02]) * (196.0 / 171.0) * 0.86)        # teinte du contour d'origine
 flat = LB[2]
 shade = 0.30 + 0.70 * ndl / flat
 metal_rgb = alu * shade[..., None] + (spec * 70)[..., None]
