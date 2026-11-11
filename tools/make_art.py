@@ -248,7 +248,16 @@ def screw_sprite(R):
     return place(np.dstack([im, a * 255]).astype(np.float32), SCREW_C, R / SCREW_RPX, n)
 for (cx, cy) in SCREWS:
     rgb, a = screw_sprite(SCREW_R)
+    # occlusion : la tete est logee dans un lamage -> fine gorge sombre + assombrissement doux autour
+    d = np.hypot(xx - cx, yy - cy) - SCREW_R
+    ao = 0.70 * np.exp(-((d - 0.8) / 1.6) ** 2) + 0.38 * np.exp(-np.clip(d, 0, None) / 7.0) * (d > -1)
+    darken(img, ao)
     put_sprite(img, None, rgb, a, cx, cy, 2 * SCREW_R, 0.55, 0.65)
+    # occlusion sur le bord de la tete (cote oppose a la lumiere plus sombre)
+    rr = np.hypot(xx - cx, yy - cy) / SCREW_R
+    side = np.clip(((xx - cx) + (yy - cy)) / (SCREW_R * 1.4142), 0, 1)
+    edge = np.clip((rr - 0.78) / 0.22, 0, 1) ** 1.6 * (rr <= 1.0) * (0.30 + 0.30 * side)
+    darken(img, edge)
 
 # ------------------------------------------------------------------ 7. LED : siege sombre + lentille eteinte (la lentille allumee est dessinee par le plugin)
 from photo_controls_arc import led_variants
