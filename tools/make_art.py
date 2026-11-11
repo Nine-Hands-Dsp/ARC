@@ -289,7 +289,8 @@ for side, cy, _ in JACKS:
 
 # ------------------------------------------------------------------ sorties
 os.makedirs(OUT, exist_ok=True)
-bg = np.dstack([np.clip(img, 0, 255), np.clip(alpha, 0, 1) * 255]).astype(np.uint8)
+BRIGHT = 0.84                                                # luminosite generale de la pedale
+bg = np.dstack([np.clip(img * BRIGHT, 0, 255), np.clip(alpha, 0, 1) * 255]).astype(np.uint8)
 Image.fromarray(bg, 'RGBA').save(os.path.join(OUT, 'background.png'), optimize=True)
 
 # repere du potard (seul calque qui tourne), cadre carre centre sur le potard
