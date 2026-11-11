@@ -4,11 +4,7 @@ Plugin VST3 (Windows / macOS) et AU (macOS) qui simule un archet électronique :
 sustain infini, attaque en « swell » sans médiator, modes harmoniques, position de l'archet sur la corde.
 Dans le DAW, il apparaît sous le nom **Arc**, fabricant **NINE HANDS | DSP**.
 
-v2.7.1 : plus aucun CC MIDI assigné par défaut (tout passe par le MIDI Learn)
-v2.7.0 : clic droit > Plugin size > Default size (new windows) : taille par défaut des nouvelles fenêtres au choix, comme dans Octopus
-v2.6.0 : MIDI Learn au clic droit sur chaque commande (Clear MIDI, assignations sauvegardées avec le projet)
-v2.5.1 : plus de "poc" ni de note qui décroche à chaque coup de médiator (la corde virtuelle n'est plus coupée à la réattaque, même note = son continu, autre note = changement sans silence ; pas de double déclenchement ; étouffement confirmé sur 20 ms)
-v2.5.0 : anti-gel v2 (JUCE 8.0.15, caches refaits par le timer, chien de garde, aucun appel à l'hôte depuis le thread audio)
+v3.0.0 : pédale entièrement refaite (nouveau boîtier format double, pièces photo, écrans, Glow réglable au clic droit)
 
 <p align="center">
   <a href="https://github.com/Nine-Hands-Dsp/ARC/releases/latest/download/Arc-VST3-Windows.zip"><img alt="Télécharger pour Windows" src="https://img.shields.io/badge/%E2%AC%87%20T%C3%A9l%C3%A9charger-Windows-0078D6?style=for-the-badge"></a>
@@ -29,7 +25,7 @@ v2.5.0 : anti-gel v2 (JUCE 8.0.15, caches refaits par le timer, chien de garde, 
 
 ## La pédale
 
-L'interface est le visuel ARC. Les potards, les LED, la ligne d'état et l'écran de corde sont de vrais contrôles animés.
+L'interface est la pédale ARC v3 : boîtier en acier poudré gris, contour en aluminium sablé, potards, footswitches, jacks, vis et LED d'après photos. Les potards, les LED, les deux écrans et les anneaux des footswitches sont de vrais contrôles animés.
 
 ### Bouton MODE
 
@@ -68,10 +64,14 @@ Les bends et le vibrato des doigts sont suivis en 15 ms environ, quel que soit G
 
 La note tenue s'épanouit au bout d'environ une seconde vers une harmonique qui dépend de la note jouée : celle qui tombe le plus près des résonances d'un ampli et d'une pièce virtuels. Deux notes différentes à la suite ne prennent jamais la même harmonique. Pendant le larsen, un bend fait vaciller le larsen puis le fait sauter d'harmonique (parfois plusieurs fois sur un long bend) ; un vibrato large entre deux zones le fait papillonner ; en ramenant la corde à sa hauteur de départ, l'harmonique d'origine revient, sans réattaquer. Les bends restent suivis jusqu'à environ 30 dB sous SENS (ronflement ignoré), et une attaque forte fait accrocher le larsen plus vite. Le niveau reste celui du son normal et rien n'est renvoyé vers l'extérieur : aucun vrai larsen ne peut se former. La quantité est le paramètre caché « Feedback » (85 % dans le preset), automatisable dans le DAW. L'écran affiche `FEEDBACK x5` (par exemple) quand l'harmonique a pris le dessus.
 
-### Écran et ligne d'état
+### Écrans
 
-- **Ligne d'état** : le dernier réglage touché, sa valeur, son équivalent MIDI (0-127) et le dernier CC reçu. Le texte est orange ou bleu selon le mode.
+- **Écran du haut** : au repos, la barre de presets (◀ numéro et nom du preset ▶, clic sur le nom pour la liste). Dès qu'un réglage bouge, la ligne d'état prend sa place (réglage et valeur, en orange ou en bleu selon le mode), puis la barre de presets revient en fondu après 2,5 s.
 - **Écran de corde** : la corde vibre avec 1, 2 ou 3 ventres selon VOICE. Le bloc BOW se place selon POSITION. L'écran affiche aussi la note détectée, sa fréquence et l'état (IDLE, LISTENING, BOWING, RELEASE).
+
+### Glow
+
+Clic droit > **Glow** : intensité du halo des LED, des arcs et des anneaux des footswitches (25, 50, 75 ou 100 %), commune à toutes les fenêtres d'ARC.
 
 ### Taille de la fenêtre
 
@@ -95,7 +95,7 @@ Clic droit sur la pédale > **Plugin size** pour choisir 60 % (taille d'origine,
 
 ## Compilation via GitHub
 
-1. Copiez tous les fichiers à la racine du dépôt, y compris `background.jpg` et le dossier caché `.github`.
+1. Copiez tous les fichiers à la racine du dépôt, y compris le dossier `assets` et le dossier caché `.github`.
 2. L'onglet **Actions** lance « Build Arc » à chaque push.
 3. Téléchargez les **Artifacts** : `Arc-Windows-VST3` et `Arc-macOS-VST3-AU`.
 
@@ -119,7 +119,10 @@ Copiez `Arc.vst3` dans `C:\Program Files\Common Files\VST3\`, puis relancez le s
 | `PluginProcessor.*` | Paramètres, presets, MIDI, réverbération, mixage |
 | `PluginEditor.*` | Interface sur le visuel ARC |
 | `WindowMinSize.*` | Verrou : la fenêtre du DAW ne peut pas être plus petite que la pédale (Windows `.cpp`, macOS `.mm`) |
-| `background.jpg` | Visuel ARC v2.4 (1525 × 1227, même taille de pédale que Ring Think), plaque grise lisse, écritures refaites, presets en LED, nettoyé : arcs, index, LED et écrans sont dessinés en direct |
-| `docs/ARC_Manual_EN-FR_v2.6.0.pdf` | Notice complète v2.6.0, anglais puis français |
+| `assets/background.png` | Pédale ARC v3 (2350 × 1800, plein cadre, transparente autour des jacks), produite par `tools/make_art.py` d'après `design/Arc_Mockup_v003.svg` |
+| `assets/` | Repère de potard, LED allumées, logos SVG officiels, polices Poppins, pièces photo (`kit/`) |
+| `NineHandsMenu.h`, `NineHandsGlow.h`, `WigaWindowSize.h` | Menus style Octopus, réglage Glow, taille par défaut des fenêtres |
+| `tools/render` | Captures de la vraie fenêtre sous Linux (aperçu, notice) |
+| `docs/` | Notice en PDF |
 | `CMakeLists.txt` | Projet JUCE 8 (téléchargé automatiquement) |
 | `.github/workflows/build.yml` | Compilation Windows (windows-2022) et macOS |

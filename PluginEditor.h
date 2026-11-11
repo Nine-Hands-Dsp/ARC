@@ -4,151 +4,125 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "PluginProcessor.h"
 #include "WindowMinSize.h"
+#include "NineHandsMenu.h"
 
 //==============================================================================
-//  ARC (NINE HANDS | DSP) - interface sur le visuel de la pédale
-//  Toutes les coordonnées sont celles du visuel (1525 x 1227 px, même taille de pédale que Ring Think).
+//  ARC v3 (NINE HANDS | DSP) - format double, d'apres design/Arc_Mockup_v003.svg
+//  Fond : assets/background.png (2350 x 1800, pedale plein cadre, transparent autour des jacks).
+//  Repere du plugin : 1175 x 900 unites (= image / 2). Tout le reste est dessine en vectoriel par l'editeur.
 //==============================================================================
 namespace arcui
 {
-    const juce::Colour orange   { 0xffff9a30 };   // arcs, mode orange (vif)
-    const juce::Colour blue     { 0xff3ae4ff };   // arcs, mode bleu (couleur des étiquettes du bas, vive)
-    const juce::Colour ledCyan  { 0xff2ff0ff };
-    const juce::Colour textCol  { 0xffe9ecef };
+    constexpr float UW = 1175.0f, UH = 900.0f;
+
+    const juce::Colour orange   { 0xffff9228 };
+    const juce::Colour cyan     { 0xff2ee2ff };
+    const juce::Colour textCol  { 0xffe8eaee };
     const juce::Colour noteOrg  { 0xffff8a1f };
 
-    constexpr int imgW = 1525, imgH = 1227;
-    constexpr float baseScale = 1023.0f / 1525.0f; // 100 % = 1023 x 823 px, 60 % = 614 x 494 (comme Ring Think)
-
-    juce::Font font (float h, bool bold = false);
-    juce::Font mono (float h);
+    // potards : centre, rayon (unites)
+    struct KnobDef { float x, y; const char* idA; const char* idB; const char* nameA; const char* nameB; };
+    constexpr float knobR = 52.5f, arcR = 62.5f;
 }
-
-//==============================================================================
-class ArcLookAndFeel : public juce::LookAndFeel_V4
-{
-public:
-    void drawRotarySlider (juce::Graphics&, int x, int y, int w, int h, float pos,
-                           float startAngle, float endAngle, juce::Slider&) override;
-};
-
-//==============================================================================
-//  Zone cliquable posée sur un bouton dessiné dans le visuel
-//==============================================================================
-class HotSpot : public juce::Button
-{
-public:
-    HotSpot (const juce::String& name, bool circular, bool toggle = false);
-    void paintButton (juce::Graphics&, bool highlighted, bool down) override;
-    bool hitTest (int x, int y) override;
-    // clic droit : n'appuie pas sur le bouton (le menu MIDI Learn de la fenêtre s'ouvre)
-    void mouseDown (const juce::MouseEvent& e) override { if (! e.mods.isPopupMenu()) juce::Button::mouseDown (e); }
-    void mouseUp   (const juce::MouseEvent& e) override { if (! e.mods.isPopupMenu()) juce::Button::mouseUp (e); }
-    void mouseDrag (const juce::MouseEvent& e) override { if (! e.mods.isPopupMenu()) juce::Button::mouseDrag (e); }
-private:
-    bool circle;
-};
-
-//==============================================================================
-class ArcPanel : public juce::Component, private juce::Timer
-{
-public:
-    explicit ArcPanel (InfiniteBowProcessor&);
-    ~ArcPanel() override;
-    void paint (juce::Graphics&) override;
-    void resized() override;
-    void editorResized() { resizeSettle = 4; }   // anti-gel v2 : cache du fond refait quand la taille sera stable
-    void initCaches();                            // à l'ouverture de la fenêtre
-    int learnIndexFor (const juce::Component* c) const;   // commande sous le clic droit (-1 = aucune)
-
-private:
-    struct KnobSlot
-    {
-        juce::String idA, idB;
-        std::unique_ptr<juce::Slider> a, b;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attA, attB;
-    };
-
-    void timerCallback() override;
-    void setLayer (bool blueLayer);
-    void drawLed (juce::Graphics&, juce::Point<float> c, float lens, float bezel,
-                  juce::Colour col, float intensity);
-    void drawDisplay (juce::Graphics&);
-    juce::String statusText() const;
-    static juce::String noteName (float hz);
-
-    InfiniteBowProcessor& proc;
-    ArcLookAndFeel lnf;
-
-    juce::Image background, scaledBackground;
-    float scaledFor = -1.0f;
-
-    // anti-gel v2 : cache du fond refait par le timer seulement, chien de garde des redessins
-    void rebuildCaches();
-    float targetScale() const;
-    void askRepaint (juce::Rectangle<int> r);
-    int resizeSettle = 0;
-    double lastPaintMs = 0.0, repaintAskedMs = 0.0, lastScaleCheckMs = 0.0;
-
-    std::vector<std::unique_ptr<KnobSlot>> knobs;
-
-    HotSpot modeSpot { "MODE", true, true };
-    HotSpot bowSpot  { "BOW",  true, true };
-    HotSpot holdSpot { "HOLD", true, true };
-    juce::OwnedArray<HotSpot> voiceSpots, presetSpots;
-
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> modeAtt, bowAtt, holdAtt;
-    std::unique_ptr<juce::ParameterAttachment> voiceAtt;
-
-    bool layerB = false;
-    int voiceIndex = 0;
-    std::vector<float> lastValues;
-    juce::String lastParamId { "attack" };
-    int lastCC = -1, lastCCVal = 0;
-    // MIDI Learn : message dans la ligne d'état (attente, puis « <Commande> = CC n » 2 s)
-    juce::String learnLine;
-    double learnLineUntil = 0.0;
-    float shownLevel = 0.0f;
-    double phase = 0.0;
-
-    // dernier état réellement dessiné : on ne redessine une zone que si elle a changé
-    juce::String drawnStatus, drawnDisplayKey;
-    float drawnLevel = -1.0f, drawnPos = -1.0f;
-    int drawnLayer = -1, drawnVoice = -1, drawnPreset = -1, drawnBowOn = -1, drawnHoldOn = -1;
-};
 
 //==============================================================================
 class InfiniteBowEditor : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
     explicit InfiniteBowEditor (InfiniteBowProcessor&);
-    void resized() override;
+    ~InfiniteBowEditor() override;
+
     void paint (juce::Graphics&) override;
+    void resized() override;
     void mouseDown (const juce::MouseEvent&) override;
+    void mouseDrag (const juce::MouseEvent&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override;
+    void mouseDoubleClick (const juce::MouseEvent&) override;
+    void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
+
+    // outil de capture (tools/render : apercu, notice) - inutilise dans le plugin
+    void forceRenderScale (float s) { forcedScale = s; bgCache = {}; rebuildCache(); }
+    void setGlowPercent (int pc) { glow = (float) pc / 100.0f; repaint(); }
+    void setWindowHeight (int h) { setSize (juce::roundToInt ((float) h * arcui::UW / arcui::UH), h); }
+    void flash (const juce::String& text, double seconds);
+    void settleForCapture();
 
 private:
-    void applyScale (float s);
-    static constexpr int numSizes = 3;  // 60 % (défaut d'origine) / 75 % / 100 %
-    static float sizeScale (int idx);
-    float openScale = -1.0f;            // taille par défaut choisie à l'ouverture (non retenue avec le projet tant qu'inchangée)
-    void showContextMenu (int learnIdx);    // learnIdx >= 0 : clic droit sur une commande (MIDI Learn en tête du menu)
+    // ------------------------------------------------------------- zones cliquables
+    enum class HitKind { none, knob, mode, voice, preset, presetPrev, presetName, presetNext, bow, hold };
+    struct Hit { HitKind kind = HitKind::none; int index = -1; };
+    Hit hitAt (juce::Point<float> u) const;
+    juce::Point<float> toUnits (juce::Point<float> p) const { return p / k(); }
+    float k() const { return (float) getHeight() / arcui::UH; }
+
+    // ------------------------------------------------------------- dessin
+    void drawLeds (juce::Graphics&);
+    void drawLed (juce::Graphics&, juce::Point<float> c, float r, juce::Colour col, float level);
+    void drawKnobs (juce::Graphics&);
+    void drawPrint (juce::Graphics&);
+    void drawTopScreen (juce::Graphics&);
+    void drawMainScreen (juce::Graphics&);
+    void drawFootRings (juce::Graphics&);
+    juce::String statusText() const;
+    juce::String presetText() const;
+    static juce::String noteName (float hz);
+
+    // ------------------------------------------------------------- potards
+    juce::RangedAudioParameter* knobParam (int i) const;
+    void setKnob (int i, float v01, bool gesture);
+    int dragKnob = -1; float dragLastY = 0.0f;
+    float knobAngle[7] {}, knobDrawn[7] {}, blurSpan[7] {}, blurDir[7] {};
+
+    // ------------------------------------------------------------- menus, MIDI Learn, taille
+    void showContextMenu (juce::Point<float> u);
+    void showPresetMenu();
     void handleMidiMenu (int r);
-    void timerCallback() override;      // accroche le verrou de taille minimale à la fenêtre du DAW
+    int learnIndexFor (const Hit& h) const;
+    void applyScale (float s);
+    static constexpr int numSizes = 3;
+    static int sizeHeight (int idx);
+    float openScale = -1.0f;
+
+    // ------------------------------------------------------------- anti-gel v2
+    void timerCallback() override;
     void parentHierarchyChanged() override;
-    void attachMinSize();
     void visibilityChanged() override;
-    friend class ArcPanel;              // son timer surveille le moteur de rendu (anti-gel v2)
-    void useSoftwareRenderer();         // applique le moteur logiciel (Windows) ; repaint si la fenêtre hôte a changé
-    void checkRenderer();               // seulement si la fenêtre a changé ou au plus 1 fois / s
-    void resetRenderer();               // chien de garde : oublie la fenêtre mémorisée et réapplique tout
+    void useSoftwareRenderer();
+    void rebuildCache();
+    void askRepaint (juce::Rectangle<float> unitsRect);
+    void attachMinSize();
     void* lastPeer = nullptr;
-    double lastRendererCheckMs = 0.0;
-    int minW = 0, minH = 0;             // taille par défaut (60 %) = taille minimale
-    int maxW = 0, maxH = 0;             // 100 % = taille maximale
-    wiga::WindowMinSize minSize;
+    double lastRendererCheckMs = 0.0, lastPaintMs = 0.0, repaintAskedMs = 0.0, lastScaleCheckMs = 0.0;
+    int resizeSettle = 0;
+    float cachedFor = -1.0f, forcedScale = 0.0f;
 
     InfiniteBowProcessor& proc;
-    ArcPanel panel;
+    juce::Image background, bgCache, ledOrange[2], ledCyan[2], marker;
+    std::unique_ptr<juce::Drawable> arcLogo, nhLogo;
+    juce::Typeface::Ptr poppinsMed, poppinsReg, poppinsBold;
+    NineHandsMenu::MenuLnf menuLnf;
+    wiga::WindowMinSize minSize;
+    int minW = 0, minH = 0, maxW = 0, maxH = 0;
+
+    // ------------------------------------------------------------- etat affiche
+    bool layerB = false;
+    int voice = 0, preset = 0;
+    float glow = 1.0f;
+    float ledLvl[13] {};                   // 0 mode, 1-3 voice, 4-11 presets, 12 inutilise
+    float bowLvl = 0.0f, holdLvl = 0.0f, shownLevel = 0.0f;
+    double phase = 0.0;
+    bool footDown[2] { false, false };
+    Hit hover;
+
+    // ligne d'etat (meme ecran que la barre de presets) : apparait pendant un reglage puis s'efface
+    std::vector<float> lastValues;
+    juce::String lastParamId { "attack" }, learnLine;
+    double statusUntil = 0.0, learnLineUntil = 0.0;
+    float statusAlpha = 0.0f;
+    int lastCC = -1, lastCCVal = 0;
+    juce::String drawnStatus, drawnPreset, drawnDisplayKey;
+    float dStatusA = -1.0f, dLevel = -1.0f, dPos = -1.0f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (InfiniteBowEditor)
 };

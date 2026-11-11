@@ -1,778 +1,165 @@
 #include "PluginEditor.h"
 #include "BinaryData.h"
 #include "WigaWindowSize.h"
+#include "NineHandsGlow.h"
 
 using namespace arcui;
-
-juce::Font arcui::font (float h, bool bold)
-{
-    return juce::Font (juce::FontOptions (h, bold ? juce::Font::bold : juce::Font::plain));
-}
-
-juce::Font arcui::mono (float h)
-{
-    return juce::Font (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), h, juce::Font::plain));
-}
+using namespace juce;
 
 //==============================================================================
-//  Géométrie relevée sur le visuel (pixels de l'image d'origine)
+//  Geometrie (unites du plugin = pixels de background.png / 2), relevee sur Arc_Mockup_v003
 //==============================================================================
 namespace
 {
-    struct KnobGeom { float acx, acy, R, px, py, len; const char* idA; const char* idB; bool white; };
-
-    // centre de l'arc, rayon de l'arc, centre du chapeau (pivot de l'index), longueur de l'index
-    const KnobGeom knobGeom[] =
+    const KnobDef knobs[7] =
     {
-        {   182.7f,  204.5f, 83.5f,   175.3f,  198.4f, 55.7f, "attack", "release", false },
-        {   376.3f,  204.5f, 83.4f,   371.0f,  198.4f, 55.7f, "sustain", "sens", false },
-        {   568.7f,  204.6f, 83.5f,   564.9f,  198.4f, 55.7f, "position", "buzz", false },
-        {   763.0f,  201.1f, 82.5f,   763.3f,  198.4f, 55.7f, "tone", "", true },
-        {   954.6f,  204.3f, 83.5f,   956.3f,  198.4f, 55.7f, "life", "glide", false },
-        {  1147.5f,  204.4f, 83.0f,  1151.9f,  198.4f, 55.7f, "wet", "dry", false },
-        {  1340.2f,  204.2f, 83.2f,  1345.8f,  198.4f, 55.7f, "space", "output", false },
+        {  137.18f, 150.0f, "attack",   "release", "ATTACK",    "RELEASE" },
+        {  287.18f, 150.0f, "sustain",  "sens",    "SUSTAIN",   "SENS"    },
+        {  437.18f, 150.0f, "position", "buzz",    "POSITION",  "BUZZ"    },
+        {  587.18f, 150.0f, "tone",     "",        "TONE",      ""        },
+        {  737.18f, 150.0f, "life",     "glide",   "LIFE",      "GLIDE"   },
+        {  887.18f, 150.0f, "wet",      "dry",     "BOW LEVEL", "DRY"     },
+        { 1037.18f, 150.0f, "space",    "output",  "SPACE",     "OUTPUT"  },
     };
 
-    struct Led { float x, y, lens, bezel; };
-    const Led ledMode   { 183.0f, 433.0f, 12.0f, 16.0f };
-    const Led ledVoice[] = { { 440.3f, 487.5f, 9.5f, 12.5f }, { 698.4f, 487.5f, 9.5f, 12.5f }, { 940.8f, 487.5f, 9.5f, 12.5f } };
-    const Led ledPreset[] =
-    {
-        { 398.5f, 909.5f, 8.5f, 11.0f }, { 498.5f, 909.5f, 8.5f, 11.0f }, { 598.5f, 909.5f, 8.5f, 11.0f }, { 698.5f, 909.5f, 8.5f, 11.0f },
-        { 798.5f, 909.5f, 8.5f, 11.0f }, { 898.5f, 909.5f, 8.5f, 11.0f }, { 998.5f, 909.5f, 8.5f, 11.0f }, { 1098.5f, 909.5f, 8.5f, 11.0f },
-    };
-    const Led ledBow  { 239.2f, 1007.5f, 12.5f, 16.5f };
-    const Led ledHold { 1280.8f, 1010.0f, 12.5f, 16.5f };
+    const Point<float> modeBtn { 137.18f, 355.0f };   constexpr float modeBtnR = 22.5f;
+    const Point<float> modeLed { 137.18f, 291.5f };   constexpr float smallLedR = 8.0f;
+    const Rectangle<float> voiceBtn[3] = { { 271.555f, 335.0f, 165.0f, 40.0f }, { 504.68f, 335.0f, 165.0f, 40.0f }, { 737.785f, 335.0f, 165.0f, 40.0f } };
+    const Point<float> voiceLed[3] = { { 293.055f, 355.0f }, { 526.18f, 355.0f }, { 759.285f, 355.0f } };
+    constexpr float voiceLedR = 9.25f;
+    const char* voiceNames[3] = { "NORMAL", "HARM", "HARM+" };
+    const Rectangle<float> screenTop  { 203.43f, 432.0f, 767.5f, 36.0f };
+    const Rectangle<float> screenMain { 203.43f, 477.5f, 767.5f, 95.0f };
+    constexpr float presetX0 = 315.93f, presetDX = 77.5f, presetY = 667.5f;
+    const Point<float> foot[2] = { { 203.43f, 740.0f }, { 970.93f, 740.0f } };
+    constexpr float footR = 40.3f;                                       // rayon du bouton du footswitch
+    constexpr float fsRingR = footR * 1.0775f, fsRingW = footR * 0.0674f; // anneau dans la gorge (dessin d'Octopus)
+    const Rectangle<float> arcLogoBox { 475.0f, 727.5f, 225.0f, 72.5f };
+    const Rectangle<float> nhLogoBox  { 475.0f, 813.0f, 225.0f, 20.5f };
+    constexpr float arrowW = 30.0f;
 
-    const juce::Rectangle<int> voiceRects[] = { { 409, 461, 235, 54 }, { 671, 461, 220, 54 }, { 915, 461, 210, 54 } };
-    const juce::Rectangle<int> presetRects[] =   // LED + chiffre
-    {
-        { 380, 889, 62, 40 }, { 480, 889, 62, 40 }, { 580, 889, 62, 40 }, { 680, 889, 62, 40 },
-        { 780, 889, 62, 40 }, { 880, 889, 62, 40 }, { 980, 889, 62, 40 }, { 1080, 889, 62, 40 },
-    };
-    const juce::Rectangle<float> lcdRect     { 264.0f, 594.0f, 995.0f, 41.0f };
-    const juce::Rectangle<float> displayRect { 264.0f, 658.0f, 995.0f, 115.0f };
+    const char* watchIds[] = { "attack", "release", "sustain", "sens", "position", "buzz", "tone",
+                               "life", "glide", "wet", "dry", "space", "output", "mode", "layer", "bow", "hold", "feedback" };
+    constexpr int numWatch = (int) (sizeof (watchIds) / sizeof (watchIds[0]));
 
-    const juce::Point<int> modeCentre { 183, 489 }, bowCentre { 240, 1090 }, holdCentre { 1283, 1090 };
-    // écran de corde : décalage par rapport à la v2.0
-    constexpr float dispDX = -40.0f, dispDY = -57.0f;
+    constexpr float startA = -0.75f * MathConstants<float>::pi, endA = 0.75f * MathConstants<float>::pi;
 
-    const char* paramIds[] = { "attack", "release", "sustain", "sens", "position", "buzz", "tone",
-                               "life", "glide", "wet", "dry", "space", "output",
-                               "mode", "layer", "bow", "hold", "feedback" };
-    constexpr int numParamIds = (int) (sizeof (paramIds) / sizeof (paramIds[0]));
+    Point<float> presetLed (int i) { return { presetX0 + presetDX * (float) i, presetY }; }
 }
 
-//==============================================================================
-//  Potards : arc de valeur (orange ou bleu selon MODE, blanc pour TONE) + index
-//==============================================================================
-void ArcLookAndFeel::drawRotarySlider (juce::Graphics& g, int, int, int w, int h, float pos,
-                                       float startAngle, float endAngle, juce::Slider& s)
-{
-    const auto& p = s.getProperties();
-    const float R   = (float) (double) p.getWithDefault ("R", 130.0);
-    const float pdx = (float) (double) p.getWithDefault ("pdx", 0.0);
-    const float pdy = (float) (double) p.getWithDefault ("pdy", 0.0);
-    const float len = (float) (double) p.getWithDefault ("len", 80.0);
-    const bool white = p.getWithDefault ("white", false);
-    const bool blueArc = p.getWithDefault ("blue", false);
-
-    const float cx = (float) w * 0.5f, cy = (float) h * 0.5f;
-    const float angle = startAngle + pos * (endAngle - startAngle);
-    const juce::Colour col = white ? juce::Colour (0xffffffff) : (blueArc ? blue : orange);
-    const auto rounded = [] (float wd) { return juce::PathStrokeType (wd, juce::PathStrokeType::curved, juce::PathStrokeType::rounded); };
-
-    // piste éteinte : sombre, discrète
-    juce::Path track;
-    track.addCentredArc (cx, cy, R, R, 0.0f, startAngle, endAngle, true);
-    g.setColour (juce::Colours::black.withAlpha (0.45f));
-    g.strokePath (track, rounded (9.0f));
-
-    // arc de valeur : halo + trait vif + cœur clair (effet LED)
-    if (pos > 0.002f)
-    {
-        juce::Path value;
-        value.addCentredArc (cx, cy, R, R, 0.0f, startAngle, angle, true);
-        g.setColour (col.withAlpha (0.16f));
-        g.strokePath (value, rounded (13.0f));
-        g.setColour (col);
-        g.strokePath (value, rounded (6.0f));
-        g.setColour (col.interpolatedWith (juce::Colours::white, 0.55f));
-        g.strokePath (value, rounded (2.0f));
-    }
-
-    // index blanc sur le chapeau (comme sur le visuel)
-    const juce::Point<float> pivot (cx + pdx, cy + pdy);
-    const auto tip = pivot.getPointOnCircumference (len, angle);
-    const auto base = pivot.getPointOnCircumference (len * 0.06f, angle);
-    juce::Path ptr;
-    ptr.startNewSubPath (base);
-    ptr.lineTo (tip);
-    g.setColour (juce::Colours::black.withAlpha (0.35f));
-    g.strokePath (ptr, rounded (6.0f), juce::AffineTransform::translation (0.0f, 1.0f));
-    g.setColour (juce::Colour (0xffeceef0));
-    g.strokePath (ptr, rounded (4.0f));
-}
-
-//==============================================================================
-HotSpot::HotSpot (const juce::String& name, bool circular, bool toggle)
-    : juce::Button (name), circle (circular)
-{
-    setClickingTogglesState (toggle);
-    setMouseCursor (juce::MouseCursor::PointingHandCursor);
-}
-
-bool HotSpot::hitTest (int x, int y)
-{
-    if (! circle) return true;
-    const auto c = getLocalBounds().toFloat().getCentre();
-    return c.getDistanceFrom ({ (float) x, (float) y }) <= (float) getWidth() * 0.5f;
-}
-
-void HotSpot::paintButton (juce::Graphics& g, bool highlighted, bool down)
-{
-    // le bouton est déjà dessiné dans le visuel : on ne fait que l'ombrer quand on appuie
-    auto r = getLocalBounds().toFloat().reduced (3.0f);
-    const float alpha = down ? 0.28f : (highlighted ? 0.06f : 0.0f);
-    if (alpha <= 0.0f) return;
-    g.setColour (down ? juce::Colours::black.withAlpha (alpha) : juce::Colours::white.withAlpha (alpha));
-    if (circle) g.fillEllipse (r);
-    else        g.fillRoundedRectangle (r, 10.0f);
-}
-
-//==============================================================================
-//  Panneau
-//==============================================================================
-ArcPanel::ArcPanel (InfiniteBowProcessor& p) : proc (p)
-{
-    background = juce::ImageCache::getFromMemory (BinaryData::background_jpg, BinaryData::background_jpgSize);
-    setOpaque (true);
-    auto& st = proc.apvts;
-
-    auto makeSlider = [this, &st] (const KnobGeom& k, const juce::String& id, bool blueArc)
-    {
-        auto s = std::make_unique<juce::Slider>();
-        s->setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
-        s->setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-        s->setRotaryParameters (juce::degreesToRadians (225.0f), juce::degreesToRadians (495.0f), true);
-        s->setMouseDragSensitivity (260);
-        s->setLookAndFeel (&lnf);
-        s->setMouseCursor (juce::MouseCursor::PointingHandCursor);
-        auto& pr = s->getProperties();
-        pr.set ("R", k.R);
-        pr.set ("pdx", k.px - k.acx);
-        pr.set ("pdy", k.py - k.acy);
-        pr.set ("len", k.len);
-        pr.set ("white", k.white);
-        pr.set ("blue", blueArc);
-        if (auto* prm = st.getParameter (id))
-            s->setDoubleClickReturnValue (true, (double) prm->convertFrom0to1 (prm->getDefaultValue()));
-        return s;
-    };
-
-    for (const auto& k : knobGeom)
-    {
-        auto slot = std::make_unique<KnobSlot>();
-        slot->idA = k.idA; slot->idB = k.idB;
-        slot->a = makeSlider (k, k.idA, false);
-        slot->attA = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (st, k.idA, *slot->a);
-        addAndMakeVisible (*slot->a);
-        if (slot->idB.isNotEmpty())
-        {
-            slot->b = makeSlider (k, k.idB, true);
-            slot->attB = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (st, k.idB, *slot->b);
-            addChildComponent (*slot->b);
-        }
-        knobs.push_back (std::move (slot));
-    }
-
-    // bouton MODE
-    addAndMakeVisible (modeSpot);
-    modeAtt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (st, "layer", modeSpot);
-    modeSpot.onClick = [this] { setLayer (modeSpot.getToggleState()); };
-
-    // VOICE
-    for (int i = 0; i < 3; ++i)
-    {
-        auto* b = voiceSpots.add (new HotSpot ("VOICE " + juce::String (i + 1), false));
-        b->onClick = [this, i] { if (voiceAtt != nullptr) voiceAtt->setValueAsCompleteGesture ((float) i); };
-        addAndMakeVisible (b);
-    }
-    if (auto* vp = st.getParameter ("mode"))
-    {
-        voiceAtt = std::make_unique<juce::ParameterAttachment> (*vp, [this] (float v)
-        {
-            voiceIndex = juce::jlimit (0, 2, juce::roundToInt (v));
-            repaint();
-        });
-        voiceAtt->sendInitialUpdate();
-    }
-
-    // presets
-    for (int i = 0; i < InfiniteBowProcessor::numFactoryPresets; ++i)
-    {
-        auto* b = presetSpots.add (new HotSpot ("PRESET " + juce::String (i + 1), false));
-        b->onClick = [this, i]
-        {
-            proc.setCurrentProgram (i);
-            proc.updateHostDisplay (juce::AudioProcessorListener::ChangeDetails().withProgramChanged (true));
-            repaint();
-        };
-        addAndMakeVisible (b);
-    }
-
-    // footswitches
-    addAndMakeVisible (bowSpot);
-    addAndMakeVisible (holdSpot);
-    bowAtt  = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (st, "bow", bowSpot);
-    holdAtt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (st, "hold", holdSpot);
-    bowSpot.onClick  = [this] { repaint(); };
-    holdSpot.onClick = [this] { repaint(); };
-
-    lastValues.assign ((size_t) numParamIds, -1.0f);
-    for (int i = 0; i < numParamIds; ++i)
-        if (auto* prm = st.getParameter (paramIds[i]))
-            lastValues[(size_t) i] = prm->getValue();
-
-    layerB = ! modeSpot.getToggleState();   // force la mise à jour
-    setLayer (modeSpot.getToggleState());
-
-    setSize (imgW, imgH);
-    startTimerHz (30);
-}
-
-ArcPanel::~ArcPanel()
-{
-    stopTimer();
-    for (auto& k : knobs)
-    {
-        if (k->a) k->a->setLookAndFeel (nullptr);
-        if (k->b) k->b->setLookAndFeel (nullptr);
-    }
-}
-
-void ArcPanel::resized()
-{
-    for (size_t i = 0; i < knobs.size(); ++i)
-    {
-        const auto& k = knobGeom[i];
-        const int half = (int) std::ceil (k.R + 24.0f);
-        const juce::Rectangle<int> r ((int) std::lround (k.acx) - half, (int) std::lround (k.acy) - half, half * 2, half * 2);
-        knobs[i]->a->setBounds (r);
-        if (knobs[i]->b) knobs[i]->b->setBounds (r);
-    }
-
-    modeSpot.setBounds (juce::Rectangle<int> (72, 72).withCentre (modeCentre));
-    for (int i = 0; i < 3; ++i) voiceSpots[i]->setBounds (voiceRects[i]);
-    for (int i = 0; i < presetSpots.size(); ++i) presetSpots[i]->setBounds (presetRects[i]);
-    bowSpot.setBounds  (juce::Rectangle<int> (132, 132).withCentre (bowCentre));
-    holdSpot.setBounds (juce::Rectangle<int> (132, 132).withCentre (holdCentre));
-}
-
-void ArcPanel::setLayer (bool blueLayer)
-{
-    if (layerB == blueLayer) return;
-    layerB = blueLayer;
-    for (auto& k : knobs)
-        if (k->b != nullptr)
-        {
-            k->a->setVisible (! layerB);
-            k->b->setVisible (layerB);
-        }
-    repaint();
-}
-
-//==============================================================================
-void ArcPanel::drawLed (juce::Graphics& g, juce::Point<float> c, float lens, float bezel,
-                        juce::Colour col, float intensity)
-{
-    // halo : lueur qui décroît vite (comme une vraie LED sur une plaque mate), sans disque coloré net
-    if (intensity > 0.01f)
-    {
-        const float hr = bezel * 2.5f;
-        juce::ColourGradient bloom (col.withAlpha (0.34f * intensity), c.x, c.y,
-                                    col.withAlpha (0.0f), c.x + hr, c.y, true);
-        bloom.addColour (0.22, col.withAlpha (0.20f * intensity));
-        bloom.addColour (0.45, col.withAlpha (0.07f * intensity));
-        bloom.addColour (0.70, col.withAlpha (0.018f * intensity));
-        g.setGradientFill (bloom);
-        g.fillEllipse (juce::Rectangle<float> (hr * 2.0f, hr * 2.0f).withCentre (c));
-
-        const float hr2 = bezel * 1.35f;
-        juce::ColourGradient core (col.withAlpha (0.50f * intensity), c.x, c.y,
-                                   col.withAlpha (0.0f), c.x + hr2, c.y, true);
-        core.addColour (0.6, col.withAlpha (0.22f * intensity));
-        g.setGradientFill (core);
-        g.fillEllipse (juce::Rectangle<float> (hr2 * 2.0f, hr2 * 2.0f).withCentre (c));
-    }
-
-    // embase
-    g.setColour (juce::Colour (0xff08090b));
-    g.fillEllipse (juce::Rectangle<float> (bezel * 2.0f, bezel * 2.0f).withCentre (c));
-    g.setColour (intensity > 0.01f ? col.withAlpha (0.55f * intensity) : juce::Colours::white.withAlpha (0.10f));
-    g.drawEllipse (juce::Rectangle<float> (bezel * 2.0f, bezel * 2.0f).withCentre (c).reduced (0.5f), 1.6f);
-
-    // lentille
-    const auto lr = juce::Rectangle<float> (lens * 2.0f, lens * 2.0f).withCentre (c);
-    if (intensity > 0.01f)
-    {
-        const auto hot = col.interpolatedWith (juce::Colours::white, 0.85f);
-        juce::ColourGradient lit (hot, c.x, c.y, col.withMultipliedSaturation (1.2f), c.x + lens, c.y, true);
-        lit.addColour (0.45, col.interpolatedWith (juce::Colours::white, 0.35f));
-        g.setGradientFill (lit);
-        g.fillEllipse (lr);
-        if (intensity < 0.999f)
-        {
-            g.setColour (col.withMultipliedBrightness (0.20f).withAlpha (1.0f - intensity));
-            g.fillEllipse (lr);
-        }
-    }
-    else
-    {
-        // éteinte : lentille sombre, nettement moins lumineuse pour un contraste franc
-        juce::ColourGradient off (col.withMultipliedBrightness (0.30f).withMultipliedSaturation (0.6f), c.x, c.y - lens,
-                                  col.withMultipliedBrightness (0.08f), c.x, c.y + lens, false);
-        g.setGradientFill (off);
-        g.fillEllipse (lr);
-    }
-    // reflet
-    g.setColour (juce::Colours::white.withAlpha (intensity > 0.01f ? 0.70f : 0.16f));
-    g.fillEllipse (juce::Rectangle<float> (lens * 0.55f, lens * 0.4f).withCentre ({ c.x - lens * 0.35f, c.y - lens * 0.42f }));
-}
-
-// (appelé par le timer seulement, jamais par paint)
-static juce::Image downscale (const juce::Image& src, float scale)
-{
-    const int tw = juce::jmax (1, juce::roundToInt ((float) src.getWidth() * scale));
-    const int th = juce::jmax (1, juce::roundToInt ((float) src.getHeight() * scale));
-    juce::Image img = src;
-    while (img.getWidth() > tw * 2)
-        img = img.rescaled (img.getWidth() / 2, img.getHeight() / 2, juce::Graphics::highResamplingQuality);
-    return img.rescaled (tw, th, juce::Graphics::highResamplingQuality);
-}
-
-// pixels réels à l'écran par pixel du visuel : transformation de la pédale x échelle de l'écran (Windows / Retina)
-float ArcPanel::targetScale() const
-{
-    float display = 1.0f;
-    if (auto* d = juce::Desktop::getInstance().getDisplays().getDisplayForRect (getScreenBounds()))
-        display = juce::jmax (1.0f, (float) d->scale);
-    return juce::jlimit (0.05f, 4.0f, juce::Component::getApproximateScaleFactorForComponent (this) * display);
-}
-
-// fond : version réduite à la taille réelle à l'écran (net et sans crénelage) ; refaite par le timer seulement
-void ArcPanel::rebuildCaches()
-{
-    if (! background.isValid()) return;
-    const float phys = targetScale();
-    if (std::abs (phys - scaledFor) <= 0.001f && scaledBackground.isValid()) return;
-    scaledBackground = phys < 0.999f ? downscale (background, phys) : background;
-    scaledFor = phys;
-    askRepaint (getLocalBounds());
-}
-
-void ArcPanel::initCaches() { resizeSettle = 0; rebuildCaches(); }
-
-void ArcPanel::askRepaint (juce::Rectangle<int> r)
-{
-    if (repaintAskedMs <= 0.0) repaintAskedMs = juce::Time::getMillisecondCounterHiRes();
-    repaint (r);
-}
-
-void ArcPanel::paint (juce::Graphics& g)
-{
-    // anti-gel v2 : aucun calcul lourd ici, on dessine le fond déjà réduit par le timer (ou l'original en attendant)
-    lastPaintMs = juce::Time::getMillisecondCounterHiRes();
-    repaintAskedMs = 0.0;
-    g.fillAll (juce::Colour (0xff2a2d36));
-    const juce::Image& bg = scaledBackground.isValid() ? scaledBackground : background;
-    if (bg.isValid())
-    {
-        const float inv = (float) imgW / (float) bg.getWidth();
-        g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
-        g.drawImageTransformed (bg, juce::AffineTransform::scale (inv));
-    }
-
-    const juce::Colour layerCol = layerB ? blue : orange;
-
-    // LED du bouton MODE : orange ou bleue
-    drawLed (g, { ledMode.x, ledMode.y }, ledMode.lens, ledMode.bezel, layerCol, 1.0f);
-
-    // VOICE
-    for (int i = 0; i < 3; ++i)
-        drawLed (g, { ledVoice[i].x, ledVoice[i].y }, ledVoice[i].lens, ledVoice[i].bezel,
-                 i == 0 ? orange : ledCyan, i == voiceIndex ? 1.0f : 0.0f);
-
-    // presets
-    const int cur = proc.currentPreset.load();
-    for (int i = 0; i < InfiniteBowProcessor::numFactoryPresets; ++i)
-        drawLed (g, { ledPreset[i].x, ledPreset[i].y }, ledPreset[i].lens, ledPreset[i].bezel,
-                 i < 4 ? orange : ledCyan, i == cur ? 1.0f : 0.0f);
-
-    // footswitches : BOW respire avec la corde, HOLD (bouton ou commande MIDI apprise)
-    const bool bowOn  = proc.apvts.getRawParameterValue ("bow")->load() > 0.5f;
-    const bool holdOn = proc.apvts.getRawParameterValue ("hold")->load() > 0.5f || proc.midiHold.load();
-    drawLed (g, { ledBow.x, ledBow.y }, ledBow.lens, ledBow.bezel, orange,
-             bowOn ? 0.55f + 0.45f * shownLevel : 0.0f);
-    drawLed (g, { ledHold.x, ledHold.y }, ledHold.lens, ledHold.bezel, ledCyan, holdOn ? 1.0f : 0.0f);
-
-    // ligne d'état : couleur du mode
-    g.setColour (layerCol);
-    g.setFont (mono (25.0f));
-    g.drawText (statusText(), lcdRect.reduced (16.0f, 0.0f), juce::Justification::centred, true);
-
-    drawDisplay (g);     // le logo NINE HANDS | DSP fait partie du visuel
-
-    // (le nom du preset n'est plus affiché sur la pédale : il reste visible dans le DAW)
-}
-
-void ArcPanel::drawDisplay (juce::Graphics& g)
-{
-    // l'écran a été déplacé dans la v2.4 : on dessine dans le repère de la v2.0, décalé
-    juce::Graphics::ScopedSaveState sss (g);
-    g.addTransform (juce::AffineTransform::translation (dispDX, dispDY));
-
-    const float nutX = 325.0f, bridgeX = 1005.0f, cy = 772.0f;
-
-    // sillet et chevalet
-    g.setColour (juce::Colour (0xffe6e7e9));
-    g.fillRoundedRectangle (nutX, cy - 27.0f, 10.0f, 54.0f, 4.0f);
-    g.fillRoundedRectangle (bridgeX, cy - 27.0f, 10.0f, 54.0f, 4.0f);
-
-    // corde en onde stationnaire (1, 2 ou 3 ventres selon VOICE)
-    const float x0 = nutX + 10.0f, x1 = bridgeX;
-    const float k = (float) (voiceIndex + 1);
-    const float amp = shownLevel * 21.0f;
-    juce::Path p;
-    for (int i = 0; i <= 160; ++i)
-    {
-        const float u = (float) i / 160.0f;
-        const float shape = std::sin (juce::MathConstants<float>::pi * k * u);
-        const float ripple = 0.18f * std::sin (juce::MathConstants<float>::pi * (2.0f * k + 1.0f) * u) * (float) std::sin (phase * 2.3);
-        const float y = cy + amp * (shape * (float) std::sin (phase) + ripple);
-        const float x = x0 + u * (x1 - x0);
-        if (i == 0) p.startNewSubPath (x, y); else p.lineTo (x, y);
-    }
-    g.setColour (ledCyan.withAlpha (0.10f + 0.25f * shownLevel));
-    g.strokePath (p, juce::PathStrokeType (10.0f));
-    g.setColour (ledCyan);
-    g.strokePath (p, juce::PathStrokeType (3.2f));
-
-    // archet placé selon POSITION (depuis le chevalet)
-    const float posFrac = 0.04f + 0.46f * proc.apvts.getRawParameterValue ("position")->load();
-    const float bx = x1 - posFrac * (x1 - x0);
-    const auto box = juce::Rectangle<float> (64.0f, 78.0f).withCentre ({ bx, cy });
-    const bool bowing = proc.uiState.load() == 2;
-    g.setColour (juce::Colour (0xff0b0c10).withAlpha (0.92f));
-    g.fillRoundedRectangle (box, 8.0f);
-    g.setColour (bowing ? noteOrg : noteOrg.withAlpha (0.45f));
-    g.drawRoundedRectangle (box, 8.0f, bowing ? 3.2f : 2.0f);
-    g.setFont (font (18.0f));
-    g.drawText ("BOW", box, juce::Justification::centred, false);
-
-    // séparateur
-    g.setColour (juce::Colour (0xff2c2f36));
-    g.fillRect (1040.0f, 727.0f, 1.8f, 91.0f);
-
-    // note détectée
-    const float hz = proc.uiPitchHz.load();
-    g.setColour (hz > 0.0f ? noteOrg : juce::Colour (0xff6c7380));
-    g.setFont (font (46.0f, true));
-    g.drawText (hz > 0.0f ? noteName (hz) : "--", juce::Rectangle<float> (1062.0f, 721.0f, 230.0f, 48.0f),
-                juce::Justification::centredLeft, false);
-    g.setColour (textCol);
-    g.setFont (mono (20.0f));
-    g.drawText (hz > 0.0f ? juce::String (hz, 1) + " Hz" : "no pitch", juce::Rectangle<float> (1064.0f, 771.0f, 230.0f, 24.0f),
-                juce::Justification::centredLeft, false);
-    const char* states[] = { "IDLE", "LISTENING", "BOWING", "RELEASE" };
-    juce::String stateText = states[juce::jlimit (0, 3, proc.uiState.load())];
-    const bool bypassed = proc.apvts.getRawParameterValue ("bow")->load() < 0.5f;
-    if (bypassed)
-        stateText = "BYPASS";
-    const bool larsen = ! bypassed && proc.uiFeedback.load() > 0.25f;
-    if (larsen)
-        stateText = "FEEDBACK x" + juce::String (proc.uiFbHarm.load());
-    g.setColour (larsen ? noteOrg : (bowing ? ledCyan : juce::Colour (0xff6c7380)));
-    g.drawText (stateText, juce::Rectangle<float> (1064.0f, 795.0f, 230.0f, 24.0f),
-                juce::Justification::centredLeft, false);
-}
-
-juce::String ArcPanel::noteName (float hz)
-{
-    static const char* names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-    const int midi = juce::roundToInt (69.0f + 12.0f * std::log2 (hz / 440.0f));
-    return juce::String (names[((midi % 12) + 12) % 12]) + juce::String (midi / 12 - 1);
-}
-
-int ArcPanel::learnIndexFor (const juce::Component* c) const
-{
-    if (c == nullptr) return -1;
-    for (auto& k : knobs)
-    {
-        if (c == k->a.get()) return InfiniteBowProcessor::learnIndexOf (k->idA);
-        if (c == k->b.get()) return InfiniteBowProcessor::learnIndexOf (k->idB);
-    }
-    if (c == &modeSpot) return InfiniteBowProcessor::learnLayer;
-    if (c == &bowSpot)  return InfiniteBowProcessor::learnBow;
-    if (c == &holdSpot) return InfiniteBowProcessor::learnHold;
-    for (auto* b : voiceSpots)  if (c == b) return InfiniteBowProcessor::learnVoice;
-    for (auto* b : presetSpots) if (c == b) return InfiniteBowProcessor::learnPreset;
-    return -1;
-}
-
-juce::String ArcPanel::statusText() const
-{
-    if (learnLine.isNotEmpty())
-        return learnLine;
-    juce::String s;
-    if (lastParamId == "layer")
-        s << "MODE  " << (layerB ? "BLUE" : "ORANGE");
-    else if (auto* prm = proc.apvts.getParameter (lastParamId))
-        s << prm->getName (32).toUpperCase() << "  " << prm->getCurrentValueAsText()
-          << "  (MIDI " << juce::roundToInt (prm->getValue() * 127.0f) << ")";
-    if (lastCC >= 0)
-        s << "  |  CC" << lastCC << "=" << lastCCVal;
-    if (proc.midiHold.load())
-        s << "  |  HOLD";
-    return s;
-}
-
-void ArcPanel::timerCallback()
-{
-    const double now = juce::Time::getMillisecondCounterHiRes();
-    auto* ed = findParentComponentOfClass<InfiniteBowEditor>();
-    if (ed != nullptr) ed->checkRenderer();          // fenêtre hôte recréée, ou au plus 1 fois par seconde
-
-    // cache du fond : refait ici seulement (jamais dans paint), après stabilisation de la taille ou changement d'échelle
-    if (resizeSettle > 0 && --resizeSettle == 0) rebuildCaches();
-    else if (resizeSettle == 0 && now - lastScaleCheckMs > 250.0)
-    {
-        lastScaleCheckMs = now;
-        if (std::abs (targetScale() - scaledFor) > 0.01f) rebuildCaches();
-    }
-
-    // chien de garde : un redessin demandé n'arrive pas -> on relance le moteur de rendu et on redessine tout
-    if (repaintAskedMs > 0.0 && isShowing() && now - repaintAskedMs > 1500.0 && lastPaintMs < repaintAskedMs)
-    {
-        repaintAskedMs = 0.0;
-        if (ed != nullptr) ed->resetRenderer();
-        repaint();
-    }
-
-    // quel réglage vient de bouger (souris, automation, MIDI du DAW) ?
-    for (int i = 0; i < numParamIds; ++i)
-        if (auto* prm = proc.apvts.getParameter (paramIds[i]))
-        {
-            const float v = prm->getValue();
-            if (std::abs (v - lastValues[(size_t) i]) > 1.0e-5f)
-            {
-                lastValues[(size_t) i] = v;
-                lastParamId = paramIds[i];
-            }
-        }
-
-    // MODE peut aussi venir du DAW (automation / MIDI)
-    setLayer (proc.apvts.getRawParameterValue ("layer")->load() > 0.5f);
-
-    lastCC = proc.uiMidiCC.load();
-    lastCCVal = proc.uiMidiVal.load();
-
-    // MIDI Learn : attente puis confirmation 2 s dans la ligne d'état
-    const int learned = proc.lastLearned.exchange (-1);
-    const int lt = proc.learnTarget.load();
-    if (learned >= 0)
-    {
-        learnLine = juce::String (InfiniteBowProcessor::learnDef (learned).name) + " = CC " + juce::String (proc.ccMap[learned].load());
-        learnLineUntil = now + 2000.0;
-    }
-    else if (lt >= 0)
-    {
-        learnLine = "MIDI LEARN: move a control for " + juce::String (InfiniteBowProcessor::learnDef (lt).name);
-        learnLineUntil = now + 100.0;
-    }
-    else if (now >= learnLineUntil)
-        learnLine.clear();
-
-    shownLevel += (proc.uiLevel.load() - shownLevel) * 0.25f;
-    phase += 0.9;
-    if (phase > 1000.0) phase -= 1000.0;
-
-    // on ne redessine une zone que si ce qu'elle affiche a vraiment changé (zéro travail au repos)
-    auto changed = [] (float& drawn, float now) { if (std::abs (drawn - now) < 0.002f) return false; drawn = now; return true; };
-    auto changedInt = [] (int& drawn, int now) { if (drawn == now) return false; drawn = now; return true; };
-
-    const int  layerNow = layerB ? 1 : 0;
-    const bool layerChanged = changedInt (drawnLayer, layerNow);
-
-    // ligne d'état (texte + couleur du mode)
-    const juce::String st = statusText();
-    if (st != drawnStatus || layerChanged)
-    {
-        drawnStatus = st;
-        askRepaint (lcdRect.toNearestInt().expanded (4));
-    }
-
-    // écran : corde animée tant qu'elle vibre, sinon seulement si un élément affiché change
-    const float hz = proc.uiPitchHz.load();
-    const bool bypassed = proc.apvts.getRawParameterValue ("bow")->load() < 0.5f;
-    const bool larsen = ! bypassed && proc.uiFeedback.load() > 0.25f;
-    const juce::String displayKey = juce::String (voiceIndex) + "|" + juce::String (proc.uiState.load())
-                                  + "|" + (hz > 0.0f ? noteName (hz) + " " + juce::String (hz, 1) : juce::String ("-"))
-                                  + "|" + (bypassed ? "B" : "") + (larsen ? "L" + juce::String (proc.uiFbHarm.load()) : juce::String());
-    const bool levelChanged = changed (drawnLevel, shownLevel);
-    const bool posChanged   = changed (drawnPos, proc.apvts.getRawParameterValue ("position")->load());
-    const bool vibrating    = shownLevel > 0.002f;     // la corde bouge avec la phase
-    if (vibrating || levelChanged || posChanged || displayKey != drawnDisplayKey)
-    {
-        drawnDisplayKey = displayKey;
-        askRepaint (displayRect.toNearestInt());
-    }
-
-    // LED
-    if (layerChanged)
-        askRepaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledMode.x, (int) ledMode.y }));
-    if (changedInt (drawnVoice, voiceIndex))
-        askRepaint (juce::Rectangle<int> (820, 90).withCentre ({ 690, (int) ledVoice[0].y }));
-    if (changedInt (drawnPreset, proc.currentPreset.load()))
-        askRepaint (juce::Rectangle<int> (820, 80).withCentre ({ 748, (int) ledPreset[0].y }));
-
-    const bool bowOn  = ! bypassed;
-    const bool holdOn = proc.apvts.getRawParameterValue ("hold")->load() > 0.5f || proc.midiHold.load();
-    if (changedInt (drawnBowOn, bowOn ? 1 : 0) || (bowOn && levelChanged))   // la LED BOW respire avec la corde
-        askRepaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledBow.x, (int) ledBow.y }));
-    if (changedInt (drawnHoldOn, holdOn ? 1 : 0))
-        askRepaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledHold.x, (int) ledHold.y }));
-}
-
-//==============================================================================
-//  Éditeur : met la pédale à l'échelle (menu clic droit)
 //==============================================================================
 InfiniteBowEditor::InfiniteBowEditor (InfiniteBowProcessor& p)
-    : AudioProcessorEditor (&p), proc (p), panel (p)
+    : AudioProcessorEditor (&p), proc (p)
 {
-    addAndMakeVisible (panel);
-    panel.addMouseListener (this, true);
+    background = ImageCache::getFromMemory (BinaryData::background_png, BinaryData::background_pngSize);
+    marker     = ImageCache::getFromMemory (BinaryData::knob_marker_png, BinaryData::knob_marker_pngSize);
+    ledOrange[0] = ImageCache::getFromMemory (BinaryData::led_orange_160_png, BinaryData::led_orange_160_pngSize);
+    ledOrange[1] = ImageCache::getFromMemory (BinaryData::led_orange_185_png, BinaryData::led_orange_185_pngSize);
+    ledCyan[0]   = ImageCache::getFromMemory (BinaryData::led_cyan_160_png, BinaryData::led_cyan_160_pngSize);
+    ledCyan[1]   = ImageCache::getFromMemory (BinaryData::led_cyan_185_png, BinaryData::led_cyan_185_pngSize);
+    arcLogo = Drawable::createFromImageData (BinaryData::ArcLogoWhite_svg, BinaryData::ArcLogoWhite_svgSize);
+    nhLogo  = Drawable::createFromImageData (BinaryData::NineHandsLogoWhite_svg, BinaryData::NineHandsLogoWhite_svgSize);
+    poppinsMed  = Typeface::createSystemTypefaceFor (BinaryData::PoppinsMedium_ttf, BinaryData::PoppinsMedium_ttfSize);
+    poppinsReg  = Typeface::createSystemTypefaceFor (BinaryData::PoppinsRegular_ttf, BinaryData::PoppinsRegular_ttfSize);
+    poppinsBold = Typeface::createSystemTypefaceFor (BinaryData::PoppinsBold_ttf, BinaryData::PoppinsBold_ttfSize);
+    menuLnf.f = { poppinsReg, poppinsMed, poppinsBold };
 
-    // taille par défaut (60 %) = taille minimale ; 100 % = taille maximale.
-    // Entre les deux, la fenêtre se redimensionne librement (en gardant les proportions),
-    // à la souris ou avec le menu clic droit (60 / 75 / 100 %).
-    // La fenêtre du DAW elle-même est verrouillée entre ces deux tailles (voir WindowMinSize).
-    minW = juce::roundToInt ((float) imgW * baseScale * 0.6f);
-    minH = juce::roundToInt ((float) imgH * baseScale * 0.6f);
-    maxW = juce::roundToInt ((float) imgW * baseScale);
-    maxH = juce::roundToInt ((float) imgH * baseScale);
+    glow = (float) NineHandsGlow::percent (JucePlugin_Name) / 100.0f;
+    layerB = proc.apvts.getRawParameterValue ("layer")->load() > 0.5f;
+    voice  = jlimit (0, 2, roundToInt (proc.apvts.getRawParameterValue ("mode")->load()));
+    preset = proc.currentPreset.load();
+    for (int i = 0; i < 7; ++i)
+        if (auto* prm = knobParam (i)) knobAngle[i] = knobDrawn[i] = startA + prm->getValue() * (endA - startA);
 
-    setResizable (true, false);                 // redimensionnable par le DAW…
-    setResizeLimits (minW, minH, maxW, maxH);   // …entre 60 % et 100 %
-    if (auto* c = getConstrainer())
-        c->setFixedAspectRatio ((double) imgW / (double) imgH);
+    lastCC = proc.uiMidiCC.load(); lastCCVal = proc.uiMidiVal.load();
+    lastValues.assign ((size_t) numWatch, -1.0f);
+    for (int i = 0; i < numWatch; ++i)
+        if (auto* prm = proc.apvts.getParameter (watchIds[i])) lastValues[(size_t) i] = prm->getValue();
 
+    // fenetre : hauteur de Ring Think par defaut (« 60 % »), jamais plus petite ; 75 % et 100 % au clic droit
+    minH = sizeHeight (0); maxH = sizeHeight (numSizes - 1);
+    minW = roundToInt ((float) minH * UW / UH); maxW = roundToInt ((float) maxH * UW / UH);
+    setOpaque (true);
+    setResizable (true, false);
+    setResizeLimits (minW, minH, maxW, maxH);
+    if (auto* c = getConstrainer()) c->setFixedAspectRatio ((double) UW / (double) UH);
     minSize.setMinimumSize (minW, minH);
     minSize.setMaximumSize (maxW, maxH);
 
-    setOpaque (true);                           // anti-gel : l'hôte ne redessine jamais ce qui est derrière la fenêtre
-    // taille à l'ouverture : celle sauvegardée avec le projet pour cette instance si elle existe,
-    // sinon celle choisie dans le menu « Default size (new windows) » (commune à toutes les nouvelles fenêtres)
     const float saved = proc.uiScale.load();
-    if (saved > 0.0f)
-        applyScale (saved);
+    if (saved > 0.0f) applyScale (saved);
     else
     {
-        const float def = sizeScale (WigaWindowSize::defaultIndex (JucePlugin_Name, numSizes));
-        applyScale (def);
-        openScale = def;
-        proc.uiScale.store (-1.0f);             // pas de taille propre à l'instance tant qu'on ne la change pas
+        const int def = WigaWindowSize::defaultIndex (JucePlugin_Name, numSizes);
+        applyScale ((float) sizeHeight (def) / (float) maxH);
+        openScale = (float) sizeHeight (def) / (float) maxH;
+        proc.uiScale.store (-1.0f);
     }
-    panel.initCaches();
-    startTimer (250);
+    rebuildCache();
+    startTimerHz (30);
 }
 
-float InfiniteBowEditor::sizeScale (int idx)
+InfiniteBowEditor::~InfiniteBowEditor() { stopTimer(); }
+
+void InfiniteBowEditor::flash (const String& text, double seconds)
 {
-    const float sizes[numSizes] = { 0.6f, 0.75f, 1.0f };
-    return sizes[juce::jlimit (0, numSizes - 1, idx)];
+    const double now = Time::getMillisecondCounterHiRes();
+    learnLine = text;
+    learnLineUntil = statusUntil = text.isNotEmpty() ? now + seconds * 1000.0 : 0.0;
+    statusAlpha = text.isNotEmpty() ? 1.0f : 0.0f;
+}
+
+void InfiniteBowEditor::settleForCapture()
+{
+    for (int i = 0; i < 40; ++i) timerCallback();
+    for (int i = 0; i < 7; ++i) blurSpan[i] = 0.0f;
+    resizeSettle = 0; rebuildCache(); repaint();
+}
+
+int InfiniteBowEditor::sizeHeight (int idx)
+{
+    const int h[numSizes] = { 495, 619, 743 };                     // « 60 % » (= Ring Think), 75 %, 100 %
+    return h[jlimit (0, numSizes - 1, idx)];
 }
 
 void InfiniteBowEditor::applyScale (float s)
 {
-    s = juce::jlimit (0.6f, 1.0f, s);           // jamais plus petit que la taille par défaut
-    openScale = -1.0f;                          // taille choisie : retenue avec le projet
+    s = jlimit ((float) minH / (float) maxH, 1.0f, s);
+    openScale = -1.0f;
     proc.uiScale.store (s);
-    const float total = baseScale * s;
-    setSize (juce::roundToInt ((float) imgW * total), juce::roundToInt ((float) imgH * total));
-    resized();
+    const int h = roundToInt ((float) maxH * s);
+    setSize (roundToInt ((float) h * UW / UH), h);
     minSize.enforceNow();
 }
 
 void InfiniteBowEditor::resized()
 {
-    panel.setBounds (0, 0, imgW, imgH);
-
-    // la pédale remplit la fenêtre (proportions gardées), entre 60 % et 100 % ;
-    // elle n'est réduite sous 60 % (jamais coupée) que si un DAW l'impose malgré tout
-    const float fit = juce::jmin ((float) getWidth()  / ((float) imgW * baseScale),
-                                  (float) getHeight() / ((float) imgH * baseScale));
-    const float s = juce::jlimit (0.1f, 1.0f, fit);
-    panel.setTransform (juce::AffineTransform::scale (baseScale * s));
-    panel.editorResized();                      // anti-gel v2 : jamais de calcul lourd ici, le timer refait le cache
-
-    if (s >= 0.6f - 0.002f && ! (proc.uiScale.load() < 0.0f && std::abs (s - openScale) < 0.005f))
-        proc.uiScale.store (juce::jlimit (0.6f, 1.0f, s));   // taille retenue avec le projet
+    resizeSettle = 4;                                     // anti-gel v2 : le cache du fond est refait par le timer
+    const float s = (float) getHeight() / (float) maxH;
+    if (getHeight() >= minH - 2 && ! (proc.uiScale.load() < 0.0f && std::abs (s - openScale) < 0.005f))
+        proc.uiScale.store (jlimit ((float) minH / (float) maxH, 1.0f, s));
 }
 
 //==============================================================================
-// Anti-gel de la fenêtre (Windows) : JUCE 8 dessine par défaut avec Direct2D (carte graphique).
-// Avec certains pilotes (Intel notamment) la fenêtre du plugin cesse de se rafraîchir alors que
-// le DAW continue de tourner. Le moteur logiciel est stable partout et largement assez rapide ici.
+//  Anti-gel v2
 //==============================================================================
-// Anti-gel v2 (NINE HANDS | DSP) :
-//  1. moteur de rendu logiciel forcé sur Windows (Direct2D peut figer la fenêtre dans certains hôtes),
-//     appliqué à chaque nouvelle fenêtre hôte (peer) et revérifié toutes les secondes, jamais en boucle ;
-//  2. aucun calcul lourd dans paint() : le fond réduit à la taille de l'écran est refait par le timer seulement,
-//     après stabilisation de la taille ou quand l'échelle d'affichage change (au plus toutes les 250 ms) ;
-//  3. chien de garde : si un redessin demandé n'est pas arrivé au bout de 1,5 s alors que la fenêtre est
-//     visible, le moteur de rendu est réappliqué et toute la fenêtre est redessinée ;
-//  4. côté audio : aucun appel à l'hôte ni allocation depuis le thread audio (voir PluginProcessor).
 void InfiniteBowEditor::useSoftwareRenderer()
 {
     auto* peer = getPeer();
     if ((void*) peer != lastPeer) { lastPeer = (void*) peer; repaint(); }
-    lastRendererCheckMs = juce::Time::getMillisecondCounterHiRes();
+    lastRendererCheckMs = Time::getMillisecondCounterHiRes();
    #if JUCE_WINDOWS
     if (peer != nullptr)
     {
         int sw = peer->getAvailableRenderingEngines().indexOf ("Software Renderer");
         if (sw < 0) sw = 0;
-        if (peer->getCurrentRenderingEngine() != sw)
-            peer->setCurrentRenderingEngine (sw);
+        if (peer->getCurrentRenderingEngine() != sw) peer->setCurrentRenderingEngine (sw);
     }
    #endif
 }
 
-void InfiniteBowEditor::checkRenderer()
-{
-    if ((void*) getPeer() != lastPeer || juce::Time::getMillisecondCounterHiRes() - lastRendererCheckMs > 1000.0)
-        useSoftwareRenderer();
-}
-
-void InfiniteBowEditor::resetRenderer()
-{
-    lastPeer = nullptr;
-    useSoftwareRenderer();
-    repaint();
-}
-
-void InfiniteBowEditor::visibilityChanged()
-{
-    useSoftwareRenderer();
-    if (isShowing()) repaint();
-}
-
-void InfiniteBowEditor::parentHierarchyChanged()
-{
-    useSoftwareRenderer();
-    attachMinSize();
-}
+void InfiniteBowEditor::visibilityChanged() { useSoftwareRenderer(); if (isShowing()) repaint(); }
+void InfiniteBowEditor::parentHierarchyChanged() { useSoftwareRenderer(); attachMinSize(); }
 
 void InfiniteBowEditor::attachMinSize()
 {
@@ -782,46 +169,595 @@ void InfiniteBowEditor::attachMinSize()
         if (handle != nullptr && ! minSize.isAttachedTo (handle))
         {
             auto* top = &peer->getComponent();
-            minSize.attach (handle, [safe = juce::Component::SafePointer<juce::Component> (top)]
-                                    { return safe != nullptr ? safe->getWidth() : 0; });
+            minSize.attach (handle, [safe = Component::SafePointer<Component> (top)] { return safe != nullptr ? safe->getWidth() : 0; });
         }
     }
-    else
+    else minSize.detach();
+}
+
+// fond reduit a la taille reelle a l'ecran (net, sans crenelage) : timer seulement, jamais dans paint
+void InfiniteBowEditor::rebuildCache()
+{
+    if (! background.isValid() || getHeight() <= 0) return;
+    float display = 1.0f;
+    if (auto* d = Desktop::getInstance().getDisplays().getDisplayForRect (getScreenBounds())) display = jmax (1.0f, (float) d->scale);
+    const float phys = forcedScale > 0.0f ? forcedScale : jlimit (0.05f, 4.0f, Component::getApproximateScaleFactorForComponent (this) * display);
+    const int tw = jmax (1, roundToInt ((float) getWidth() * phys)), th = jmax (1, roundToInt ((float) getHeight() * phys));
+    if (bgCache.isValid() && bgCache.getWidth() == tw && bgCache.getHeight() == th) return;
+    Image img = background;
+    while (img.getWidth() > tw * 2) img = img.rescaled (img.getWidth() / 2, img.getHeight() / 2, Graphics::highResamplingQuality);
+    bgCache = (img.getWidth() == tw && img.getHeight() == th) ? img : img.rescaled (tw, th, Graphics::highResamplingQuality);
+    cachedFor = phys;
+    repaint();
+}
+
+void InfiniteBowEditor::askRepaint (Rectangle<float> u)
+{
+    if (repaintAskedMs <= 0.0) repaintAskedMs = Time::getMillisecondCounterHiRes();
+    repaint ((u * k()).getSmallestIntegerContainer().expanded (2));
+}
+
+//==============================================================================
+//  Paint
+//==============================================================================
+void InfiniteBowEditor::paint (Graphics& g)
+{
+    lastPaintMs = Time::getMillisecondCounterHiRes();
+    repaintAskedMs = 0.0;
+    g.fillAll (Colour (0xff141518));
+    if (bgCache.isValid()) g.drawImage (bgCache, getLocalBounds().toFloat());
+    else if (background.isValid()) g.drawImage (background, getLocalBounds().toFloat());
+
+    g.addTransform (AffineTransform::scale (k()));
+    drawLeds (g);
+    drawKnobs (g);
+    drawPrint (g);
+    drawTopScreen (g);
+    drawMainScreen (g);
+    drawFootRings (g);
+}
+
+void InfiniteBowEditor::drawLed (Graphics& g, Point<float> c, float r, Colour col, float level)
+{
+    if (level <= 0.003f) return;
+    // la facade recoit la lumiere : tache serree + diffusion large (dosee par Glow)
+    if (glow > 0.0f)
     {
-        minSize.detach();
+        const float hr = r * 5.2f;
+        ColourGradient gr (col.withAlpha (0.42f * glow * level), c.x, c.y, col.withAlpha (0.0f), c.x + hr, c.y, true);
+        gr.addColour (0.18, col.withAlpha (0.30f * glow * level));
+        gr.addColour (0.40, col.withAlpha (0.09f * glow * level));
+        gr.addColour (0.70, col.withAlpha (0.02f * glow * level));
+        g.setGradientFill (gr);
+        g.fillEllipse (Rectangle<float> (hr * 2.0f, hr * 2.0f).withCentre (c));
+    }
+    // lentille allumee : photo de la LED recoloree
+    const bool big = r > 8.6f;
+    const Image& im = col == cyan ? ledCyan[big ? 1 : 0] : ledOrange[big ? 1 : 0];
+    const float s = r * 3.0f;
+    g.setOpacity (jmin (1.0f, level));
+    g.drawImage (im, Rectangle<float> (s, s).withCentre (c));
+    g.setOpacity (1.0f);
+}
+
+void InfiniteBowEditor::drawLeds (Graphics& g)
+{
+    drawLed (g, modeLed, smallLedR, layerB ? cyan : orange, ledLvl[0]);
+    for (int i = 0; i < 3; ++i) drawLed (g, voiceLed[i], voiceLedR, i == 0 ? orange : cyan, ledLvl[1 + i]);
+    for (int i = 0; i < 8; ++i) drawLed (g, presetLed (i), smallLedR, i < 4 ? orange : cyan, ledLvl[4 + i]);
+}
+
+void InfiniteBowEditor::drawKnobs (Graphics& g)
+{
+    const auto rounded = [] (float w) { return PathStrokeType (w, PathStrokeType::curved, PathStrokeType::rounded); };
+    for (int i = 0; i < 7; ++i)
+    {
+        const auto& kd = knobs[i];
+        const bool white = String (kd.idB).isEmpty();
+        const Colour col = white ? Colours::white : (layerB ? cyan : orange);
+        const float a = knobAngle[i];
+        // piste + arc de valeur (style d'origine)
+        Path track; track.addCentredArc (kd.x, kd.y, arcR, arcR, 0.0f, startA, endA, true);
+        g.setColour (Colours::black.withAlpha (0.47f));
+        g.strokePath (track, rounded (4.5f));
+        if (a > startA + 0.004f)
+        {
+            Path v; v.addCentredArc (kd.x, kd.y, arcR, arcR, 0.0f, startA, a, true);
+            if (glow > 0.0f)
+                for (float w = 9.0f; w > 3.5f; w -= 1.5f)
+                {
+                    g.setColour (col.withAlpha (0.07f * glow));
+                    g.strokePath (v, rounded (w));
+                }
+            g.setColour (col);
+            g.strokePath (v, rounded (3.0f));
+            g.setColour (col.interpolatedWith (Colours::white, 0.55f));
+            g.strokePath (v, rounded (1.0f));
+        }
+        // repere photo : seul calque qui tourne (les reflets du chapeau restent fixes), flou de mouvement
+        if (marker.isValid())
+        {
+            const float d = knobR * 2.0f;
+            auto place = [&] (float ang)
+            {
+                return AffineTransform::translation (-marker.getWidth() * 0.5f, -marker.getHeight() * 0.5f)
+                         .scaled (d / (float) marker.getWidth()).rotated (ang).translated (kd.x, kd.y);
+            };
+            g.setImageResamplingQuality (Graphics::highResamplingQuality);
+            const float span = blurSpan[i];
+            if (span <= 0.0f) g.drawImageTransformed (marker, place (a));
+            else
+            {
+                const int n = jlimit (3, 14, (int) std::ceil (span / degreesToRadians (3.0f)) + 1);
+                for (int s = 0; s < n; ++s)
+                {
+                    const float t = (float) s / (float) (n - 1);
+                    g.setOpacity (jmin (1.0f, 1.8f / (float) n));
+                    g.drawImageTransformed (marker, place (a - blurDir[i] * span * t));
+                }
+                g.setOpacity (1.0f);
+            }
+        }
     }
 }
 
+void InfiniteBowEditor::drawPrint (Graphics& g)
+{
+    auto font = [this] (float h) { return Font (FontOptions (poppinsMed).withHeight (h)); };
+    // libelles des potards (double reglage : la couche active est pleine, l'autre attenuee)
+    for (int i = 0; i < 7; ++i)
+    {
+        const auto& kd = knobs[i];
+        g.setFont (font (15.5f));
+        if (String (kd.idB).isEmpty())
+        {
+            g.setColour (textCol);
+            g.drawText (kd.nameA, Rectangle<float> (130.0f, 20.0f).withCentre ({ kd.x, 233.0f }), Justification::centred, false);
+        }
+        else
+        {
+            g.setColour (orange.withAlpha (layerB ? 0.58f : 1.0f));
+            g.drawText (kd.nameA, Rectangle<float> (130.0f, 20.0f).withCentre ({ kd.x, 225.0f }), Justification::centred, false);
+            g.setColour (cyan.withAlpha (layerB ? 1.0f : 0.58f));
+            g.drawText (kd.nameB, Rectangle<float> (130.0f, 20.0f).withCentre ({ kd.x, 245.0f }), Justification::centred, false);
+        }
+    }
+    g.setColour (textCol.withAlpha (0.92f));
+    g.setFont (font (14.0f));
+    g.drawText ("MODE", Rectangle<float> (80.0f, 18.0f).withCentre ({ modeBtn.x, 396.5f }), Justification::centred, false);
+    g.setFont (font (15.0f));
+    for (int i = 0; i < 3; ++i)
+    {
+        const float cx = (voiceLed[i].x + 15.0f + voiceBtn[i].getRight() - 7.0f) * 0.5f;
+        g.setColour (textCol.withAlpha (0.94f));
+        g.drawText (voiceNames[i], Rectangle<float> (120.0f, 20.0f).withCentre ({ cx, voiceBtn[i].getCentreY() + 0.5f }), Justification::centred, false);
+    }
+    g.setFont (font (13.0f));
+    g.setColour (textCol.withAlpha (0.85f));
+    for (int i = 0; i < 8; ++i)
+        g.drawText (String (i + 1), Rectangle<float> (30.0f, 16.0f).withCentre (presetLed (i) + Point<float> (0.0f, 22.0f)), Justification::centred, false);
+    g.setFont (font (15.0f));
+    g.setColour (textCol.withAlpha (0.92f));
+    g.drawText ("BOW",  Rectangle<float> (80.0f, 20.0f).withCentre ({ foot[0].x, 815.0f }), Justification::centred, false);
+    g.drawText ("HOLD", Rectangle<float> (80.0f, 20.0f).withCentre ({ foot[1].x, 815.0f }), Justification::centred, false);
+    // inscriptions des jacks, le long des tranches (OUT a gauche, IN a droite)
+    g.setFont (font (11.0f));
+    g.setColour (textCol.withAlpha (0.78f));
+    const struct { float x, y, rot; const char* t; } jl[4] = { { 64.0f, 404.25f, -MathConstants<float>::halfPi, "OUT L" },
+        { 64.0f, 572.5f, -MathConstants<float>::halfPi, "OUT R" }, { 1111.0f, 404.25f, MathConstants<float>::halfPi, "IN L" },
+        { 1111.0f, 572.5f, MathConstants<float>::halfPi, "IN R" } };
+    for (auto& j : jl)
+    {
+        Graphics::ScopedSaveState ss (g);
+        g.addTransform (AffineTransform::rotation (j.rot).translated (j.x, j.y));
+        g.drawText (j.t, Rectangle<float> (80.0f, 14.0f).withCentre ({ 0.0f, 0.0f }), Justification::centred, false);
+    }
+    // logos (SVG officiels, blancs)
+    if (arcLogo != nullptr) arcLogo->drawWithin (g, arcLogoBox, RectanglePlacement::centred, 1.0f);
+    if (nhLogo != nullptr)  nhLogo->drawWithin (g, nhLogoBox, RectanglePlacement::centred, 0.95f);
+}
+
+juce::String InfiniteBowEditor::presetText() const
+{
+    return String (preset + 1) + "   " + String (InfiniteBowProcessor::factoryPresets[jlimit (0, InfiniteBowProcessor::numFactoryPresets - 1, preset)].name).toUpperCase();
+}
+
+juce::String InfiniteBowEditor::statusText() const
+{
+    if (learnLine.isNotEmpty()) return learnLine;
+    String s;
+    if (lastParamId == "layer") s << "MODE  " << (layerB ? "BLUE" : "ORANGE");
+    else if (auto* prm = proc.apvts.getParameter (lastParamId))
+        s << prm->getName (32).toUpperCase() << "  " << prm->getCurrentValueAsText()
+          << "  (MIDI " << roundToInt (prm->getValue() * 127.0f) << ")";
+    if (lastCC >= 0) s << "  |  CC" << lastCC << "=" << lastCCVal;
+    if (proc.midiHold.load()) s << "  |  HOLD";
+    return s;
+}
+
+void InfiniteBowEditor::drawTopScreen (Graphics& g)
+{
+    // ecran du haut : barre de presets au repos, ligne d'etat pendant les reglages (fondu croise)
+    const auto r = screenTop.reduced (4.0f, 3.5f);
+    const Font f (FontOptions (poppinsMed).withHeight (20.0f));
+    g.setFont (f);
+    if (statusAlpha > 0.0f)
+    {
+        g.setColour ((layerB ? cyan : orange).withAlpha (statusAlpha));
+        g.drawFittedText (statusText(), r.reduced (18.0f, 0.0f).toNearestInt(), Justification::centred, 1, 0.6f);
+    }
+    const float a = 1.0f - statusAlpha;
+    if (a <= 0.0f) return;
+    auto arrow = [&] (Rectangle<float> ar, bool left, bool hot)
+    {
+        Path p; const auto c = ar.getCentre(); const float sz = 5.5f;
+        if (left) p.addTriangle (c.x + sz * 0.6f, c.y - sz, c.x + sz * 0.6f, c.y + sz, c.x - sz * 0.8f, c.y);
+        else      p.addTriangle (c.x - sz * 0.6f, c.y - sz, c.x - sz * 0.6f, c.y + sz, c.x + sz * 0.8f, c.y);
+        g.setColour (Colour (0xffd8dbe0).withAlpha ((hot ? 1.0f : 0.6f) * a));
+        g.fillPath (p);
+    };
+    arrow (r.withWidth (arrowW), true, hover.kind == HitKind::presetPrev);
+    arrow (r.withTrimmedLeft (r.getWidth() - arrowW), false, hover.kind == HitKind::presetNext);
+    g.setColour (textCol.withAlpha ((hover.kind == HitKind::presetName ? 1.0f : 0.94f) * a));
+    g.drawFittedText (presetText(), r.reduced (arrowW, 0.0f).toNearestInt(), Justification::centred, 1, 0.7f);
+}
+
+void InfiniteBowEditor::drawMainScreen (Graphics& g)
+{
+    const auto& sr = screenMain;
+    const float cy = sr.getCentreY(), nutX = sr.getX() + 23.0f, bridgeX = sr.getX() + 565.0f;
+    g.setColour (Colour (0xffe6e7e9));
+    g.fillRoundedRectangle (nutX - 3.5f, cy - 22.0f, 7.0f, 44.0f, 3.0f);
+    g.fillRoundedRectangle (bridgeX - 3.5f, cy - 22.0f, 7.0f, 44.0f, 3.0f);
+
+    // corde en onde stationnaire (1, 2 ou 3 ventres selon VOICE)
+    const float x0 = nutX + 3.5f, x1 = bridgeX - 3.5f, kk = (float) (voice + 1), amp = shownLevel * 13.0f;
+    Path p;
+    for (int i = 0; i <= 160; ++i)
+    {
+        const float u = (float) i / 160.0f;
+        const float shape = std::sin (MathConstants<float>::pi * kk * u);
+        const float ripple = 0.18f * std::sin (MathConstants<float>::pi * (2.0f * kk + 1.0f) * u) * (float) std::sin (phase * 2.3);
+        const float y = cy + amp * (shape * (float) std::sin (phase) + ripple);
+        const float x = x0 + u * (x1 - x0);
+        if (i == 0) p.startNewSubPath (x, y); else p.lineTo (x, y);
+    }
+    g.setColour (cyan.withAlpha ((0.10f + 0.25f * shownLevel) * jmax (0.25f, glow)));
+    g.strokePath (p, PathStrokeType (8.0f));
+    g.setColour (cyan);
+    g.strokePath (p, PathStrokeType (2.5f));
+
+    // archet place selon POSITION (depuis le chevalet)
+    const float posFrac = 0.04f + 0.46f * proc.apvts.getRawParameterValue ("position")->load();
+    const float bx = x1 - posFrac * (x1 - x0);
+    const auto box = Rectangle<float> (48.0f, 62.0f).withCentre ({ bx, cy });
+    const bool bowing = proc.uiState.load() == 2;
+    g.setColour (Colour (0xff0b0c10).withAlpha (0.92f));
+    g.fillRoundedRectangle (box, 6.0f);
+    g.setColour (bowing ? noteOrg : noteOrg.withAlpha (0.45f));
+    g.drawRoundedRectangle (box, 6.0f, bowing ? 2.5f : 1.6f);
+    g.setFont (Font (FontOptions (poppinsMed).withHeight (13.0f)));
+    g.drawText ("BOW", box, Justification::centred, false);
+
+    // separateur + note detectee
+    const float sx = sr.getX() + 590.0f;
+    g.setColour (Colour (0xff2c2f36));
+    g.fillRect (sx, sr.getY() + 11.0f, 1.5f, sr.getHeight() - 22.0f);
+    const float hz = proc.uiPitchHz.load();
+    g.setColour (hz > 0.0f ? noteOrg : Colour (0xff6c7380));
+    g.setFont (Font (FontOptions (poppinsBold).withHeight (35.0f)));
+    g.drawText (hz > 0.0f ? noteName (hz) : "--", Rectangle<float> (sx + 20.0f, sr.getY() + 13.0f, 150.0f, 36.0f), Justification::centredLeft, false);
+    const Font mono (FontOptions (Font::getDefaultMonospacedFontName(), 15.0f, Font::plain));
+    g.setFont (mono);
+    g.setColour (textCol);
+    g.drawText (hz > 0.0f ? String (hz, 1) + " Hz" : "no pitch", Rectangle<float> (sx + 22.0f, sr.getY() + 51.0f, 150.0f, 16.0f), Justification::centredLeft, false);
+    const char* states[] = { "IDLE", "LISTENING", "BOWING", "RELEASE" };
+    String st = states[jlimit (0, 3, proc.uiState.load())];
+    const bool bypassed = proc.apvts.getRawParameterValue ("bow")->load() < 0.5f;
+    const bool larsen = ! bypassed && proc.uiFeedback.load() > 0.25f;
+    if (bypassed) st = "BYPASS";
+    if (larsen) st = "FEEDBACK x" + String (proc.uiFbHarm.load());
+    g.setColour (larsen ? noteOrg : (bowing ? cyan : Colour (0xff6c7380)));
+    g.drawText (st, Rectangle<float> (sx + 22.0f, sr.getY() + 69.0f, 150.0f, 16.0f), Justification::centredLeft, false);
+}
+
+void InfiniteBowEditor::drawFootRings (Graphics& g)
+{
+    // anneau lumineux dans la gorge du footswitch (dessin d'Octopus) : halo dose par Glow, trait net, coeur clair
+    for (int i = 0; i < 2; ++i)
+    {
+        const auto c = foot[i];
+        const float lvl = i == 0 ? bowLvl : holdLvl;
+        const Colour col = i == 0 ? orange : cyan;
+        if (lvl > 0.003f)
+        {
+            Path ring; ring.addEllipse (c.x - fsRingR, c.y - fsRingR, fsRingR * 2.0f, fsRingR * 2.0f);
+            const float kr = fsRingR / 33.2f;
+            if (glow > 0.0f)
+                for (float hw = 20.0f; hw > 3.0f; hw -= 1.5f)
+                {
+                    g.setColour (col.withAlpha (jmin (1.0f, 0.075f * glow) * lvl));
+                    g.strokePath (ring, PathStrokeType (hw * kr));
+                }
+            g.setColour (col.withAlpha (0.85f * lvl));
+            g.strokePath (ring, PathStrokeType (fsRingW));
+            g.setColour (col.interpolatedWith (Colours::white, 0.6f).withAlpha (0.9f * lvl));
+            g.strokePath (ring, PathStrokeType (fsRingW * 0.42f));
+        }
+        if (footDown[i])
+        {
+            const float r = footR * 0.98f;
+            g.setColour (Colours::black.withAlpha (0.25f));
+            g.fillEllipse (c.x - r, c.y - r, r * 2.0f, r * 2.0f);
+        }
+    }
+}
+
+juce::String InfiniteBowEditor::noteName (float hz)
+{
+    static const char* names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+    const int midi = roundToInt (69.0f + 12.0f * std::log2 (hz / 440.0f));
+    return String (names[((midi % 12) + 12) % 12]) + String (midi / 12 - 1);
+}
+
+//==============================================================================
+//  Timer (30 Hz) : etat affiche, fondus, redessins cibles
+//==============================================================================
 void InfiniteBowEditor::timerCallback()
 {
-    checkRenderer();        // au cas où la fenêtre a été recréée par l'hôte (changement d'écran, d'échelle…)
-    attachMinSize();        // le DAW peut recréer sa fenêtre (dock, ré-ouverture…)
-    minSize.enforceNow();   // et la rouvrir à une taille mémorisée trop petite
+    const double now = Time::getMillisecondCounterHiRes();
+    if ((void*) getPeer() != lastPeer || now - lastRendererCheckMs > 1000.0) useSoftwareRenderer();
+    attachMinSize();
+    if (getWidth() < minW - 2 || getHeight() < minH - 2) minSize.enforceNow();
 
-    // si le DAW a quand même rétréci la pédale sous la taille par défaut, on la redemande
-    // (tolérance de 2 px : avec la mise à l'échelle Windows (125 %, 150 %…) l'hôte arrondit les tailles ;
-    // sans marge, les deux se renvoient la fenêtre en boucle)
-    if (getWidth() < minW - 2 || getHeight() < minH - 2)
-        setSize (juce::jmax (getWidth(), minW), juce::jmax (getHeight(), minH));
+    if (resizeSettle > 0 && --resizeSettle == 0) rebuildCache();
+    else if (resizeSettle == 0 && now - lastScaleCheckMs > 250.0) { lastScaleCheckMs = now; rebuildCache(); }
+
+    // chien de garde : redessin demande mais pas servi -> moteur de rendu reapplique, tout redessine
+    if (repaintAskedMs > 0.0 && isShowing() && now - repaintAskedMs > 1500.0 && lastPaintMs < repaintAskedMs)
+    {
+        repaintAskedMs = 0.0; lastPeer = nullptr; useSoftwareRenderer(); repaint();
+    }
+
+    // reglage qui vient de bouger (souris, automation, MIDI) -> ligne d'etat
+    for (int i = 0; i < numWatch; ++i)
+        if (auto* prm = proc.apvts.getParameter (watchIds[i]))
+        {
+            const float v = prm->getValue();
+            if (std::abs (v - lastValues[(size_t) i]) > 1.0e-5f)
+            {
+                if (lastValues[(size_t) i] >= 0.0f) { lastParamId = watchIds[i]; statusUntil = now + 2500.0; }
+                lastValues[(size_t) i] = v;
+            }
+        }
+
+    // dernier CC recu (affiche dans la ligne d'etat)
+    {
+        const int cc = proc.uiMidiCC.load(), cv = proc.uiMidiVal.load();
+        if (cc != lastCC || cv != lastCCVal) { if (cc >= 0) statusUntil = now + 2500.0; lastCC = cc; lastCCVal = cv; }
+    }
+
+    // MIDI Learn
+    const int learned = proc.lastLearned.exchange (-1);
+    const int lt = proc.learnTarget.load();
+    if (learned >= 0)
+    {
+        learnLine = String (InfiniteBowProcessor::learnDef (learned).name).toUpperCase() + "  =  CC " + String (proc.ccMap[learned].load());
+        learnLineUntil = statusUntil = now + 2000.0;
+    }
+    else if (lt >= 0)
+    {
+        learnLine = String::fromUTF8 ("MIDI LEARN  \xc2\xb7  ") + String (InfiniteBowProcessor::learnDef (lt).name).toUpperCase();
+        learnLineUntil = statusUntil = now + 150.0;
+    }
+    else if (now >= learnLineUntil) learnLine.clear();
+
+    const float st = now < statusUntil ? 1.0f : 0.0f;
+    statusAlpha += (st - statusAlpha) * (st > statusAlpha ? 0.45f : 0.30f);
+    if (statusAlpha < 0.005f) statusAlpha = 0.0f;
+    if (statusAlpha > 0.995f) statusAlpha = 1.0f;
+
+    // etat des commandes
+    const bool lb = proc.apvts.getRawParameterValue ("layer")->load() > 0.5f;
+    const int  vc = jlimit (0, 2, roundToInt (proc.apvts.getRawParameterValue ("mode")->load()));
+    const int  pr = proc.currentPreset.load();
+    const bool bowOn  = proc.apvts.getRawParameterValue ("bow")->load() > 0.5f;
+    const bool holdOn = proc.apvts.getRawParameterValue ("hold")->load() > 0.5f || proc.midiHold.load();
+    if (lb != layerB || vc != voice || pr != preset) { layerB = lb; voice = vc; preset = pr; repaint(); }
+
+    auto fade = [] (float& v, float target) { const float d = target - v; v += d * (d > 0.0f ? 0.45f : 0.28f); if (std::abs (target - v) < 0.003f) v = target; };
+    float before[13]; std::copy (std::begin (ledLvl), std::end (ledLvl), before);
+    fade (ledLvl[0], 1.0f);
+    for (int i = 0; i < 3; ++i) fade (ledLvl[1 + i], i == voice ? 1.0f : 0.0f);
+    for (int i = 0; i < 8; ++i) fade (ledLvl[4 + i], i == preset ? 1.0f : 0.0f);
+    const float bowBefore = bowLvl, holdBefore = holdLvl;
+    fade (bowLvl, bowOn ? 0.75f + 0.25f * shownLevel : 0.0f);
+    fade (holdLvl, holdOn ? 1.0f : 0.0f);
+    for (int i = 0; i < 12; ++i)
+        if (before[i] != ledLvl[i])
+        {
+            const auto c = i == 0 ? modeLed : i < 4 ? voiceLed[i - 1] : presetLed (i - 4);
+            askRepaint (Rectangle<float> (110.0f, 110.0f).withCentre (c));
+        }
+    if (bowBefore != bowLvl)   askRepaint (Rectangle<float> (150.0f, 150.0f).withCentre (foot[0]));
+    if (holdBefore != holdLvl) askRepaint (Rectangle<float> (150.0f, 150.0f).withCentre (foot[1]));
+
+    // potards : angle suivi sans retard, flou de mouvement (montee immediate, retombee x0,6)
+    for (int i = 0; i < 7; ++i)
+        if (auto* prm = knobParam (i))
+        {
+            const float a = startA + prm->getValue() * (endA - startA);
+            const float v = a - knobAngle[i];
+            if (std::abs (v) > 1.0e-5f) blurDir[i] = v > 0.0f ? 1.0f : -1.0f;
+            const float spanBefore = blurSpan[i];
+            blurSpan[i] = jmax (jmin (std::abs (v), degreesToRadians (40.0f)), blurSpan[i] * 0.6f);
+            if (blurSpan[i] < 0.002f) blurSpan[i] = 0.0f;
+            if (std::abs (a - knobAngle[i]) > 1.0e-5f || spanBefore != blurSpan[i])
+            {
+                knobAngle[i] = a;
+                askRepaint (Rectangle<float> (arcR * 2.0f + 24.0f, arcR * 2.0f + 24.0f).withCentre ({ knobs[i].x, knobs[i].y }));
+            }
+        }
+
+    // ecran du haut
+    const String stTxt = statusText(), prTxt = presetText();
+    if (std::abs (dStatusA - statusAlpha) > 0.002f || stTxt != drawnStatus || prTxt != drawnPreset)
+    {
+        dStatusA = statusAlpha; drawnStatus = stTxt; drawnPreset = prTxt;
+        askRepaint (screenTop);
+    }
+
+    // ecran de corde : anime tant que la corde vibre, sinon seulement si un element change
+    shownLevel += (proc.uiLevel.load() - shownLevel) * 0.25f;
+    phase += 0.9; if (phase > 1000.0) phase -= 1000.0;
+    const float hz = proc.uiPitchHz.load();
+    const String key = String (voice) + "|" + String (proc.uiState.load()) + "|" + (hz > 0.0f ? noteName (hz) + String (hz, 1) : String ("-"))
+                     + "|" + String ((int) bowOn) + String (proc.uiFeedback.load() > 0.25f ? proc.uiFbHarm.load() : 0);
+    const float pos = proc.apvts.getRawParameterValue ("position")->load();
+    if (shownLevel > 0.002f || std::abs (dLevel - shownLevel) > 0.002f || std::abs (dPos - pos) > 0.002f || key != drawnDisplayKey)
+    {
+        dLevel = shownLevel; dPos = pos; drawnDisplayKey = key;
+        askRepaint (screenMain);
+    }
 }
 
-void InfiniteBowEditor::paint (juce::Graphics& g)
+//==============================================================================
+//  Souris
+//==============================================================================
+InfiniteBowEditor::Hit InfiniteBowEditor::hitAt (Point<float> u) const
 {
-    g.fillAll (juce::Colours::black);   // visible seulement si le DAW impose une forme différente
+    for (int i = 0; i < 7; ++i)
+        if (u.getDistanceFrom ({ knobs[i].x, knobs[i].y }) <= knobR * 1.1f) return { HitKind::knob, i };
+    if (u.getDistanceFrom (modeBtn) <= modeBtnR * 1.25f || u.getDistanceFrom (modeLed) <= 14.0f) return { HitKind::mode, 0 };
+    for (int i = 0; i < 3; ++i) if (voiceBtn[i].expanded (2.0f).contains (u)) return { HitKind::voice, i };
+    for (int i = 0; i < 8; ++i)
+        if (Rectangle<float> (40.0f, 46.0f).withCentre (presetLed (i) + Point<float> (0.0f, 10.0f)).contains (u)) return { HitKind::preset, i };
+    for (int i = 0; i < 2; ++i)
+        if (u.getDistanceFrom (foot[i]) <= footR * 1.35f) return { i == 0 ? HitKind::bow : HitKind::hold, i };
+    if (screenTop.contains (u))
+        return { u.x < screenTop.getX() + arrowW + 4.0f ? HitKind::presetPrev : u.x > screenTop.getRight() - arrowW - 4.0f ? HitKind::presetNext : HitKind::presetName, 0 };
+    return {};
 }
 
-void InfiniteBowEditor::mouseDown (const juce::MouseEvent& e)
+juce::RangedAudioParameter* InfiniteBowEditor::knobParam (int i) const
 {
-    if (! e.mods.isPopupMenu())
-        return;
-    showContextMenu (panel.learnIndexFor (e.eventComponent));
+    const auto& kd = knobs[i];
+    const bool b = layerB && String (kd.idB).isNotEmpty();
+    return proc.apvts.getParameter (b ? kd.idB : kd.idA);
 }
 
+void InfiniteBowEditor::setKnob (int i, float v01, bool gesture)
+{
+    if (auto* prm = knobParam (i))
+    {
+        v01 = jlimit (0.0f, 1.0f, v01);
+        if (! gesture) prm->beginChangeGesture();
+        prm->setValueNotifyingHost (v01);
+        if (! gesture) prm->endChangeGesture();
+    }
+}
+
+int InfiniteBowEditor::learnIndexFor (const Hit& h) const
+{
+    switch (h.kind)
+    {
+        case HitKind::knob:   if (auto* prm = knobParam (h.index)) return InfiniteBowProcessor::learnIndexOf (prm->getParameterID()); return -1;
+        case HitKind::mode:   return InfiniteBowProcessor::learnLayer;
+        case HitKind::voice:  return InfiniteBowProcessor::learnVoice;
+        case HitKind::preset: case HitKind::presetName: case HitKind::presetPrev: case HitKind::presetNext: return InfiniteBowProcessor::learnPreset;
+        case HitKind::bow:    return InfiniteBowProcessor::learnBow;
+        case HitKind::hold:   return InfiniteBowProcessor::learnHold;
+        default: return -1;
+    }
+}
+
+void InfiniteBowEditor::mouseMove (const MouseEvent& e)
+{
+    const auto h = hitAt (toUnits (e.position));
+    if (h.kind != hover.kind || h.index != hover.index) { hover = h; askRepaint (screenTop); }
+    setMouseCursor (h.kind == HitKind::none ? MouseCursor::NormalCursor
+                  : h.kind == HitKind::knob ? MouseCursor::UpDownResizeCursor : MouseCursor::PointingHandCursor);
+}
+
+void InfiniteBowEditor::mouseDown (const MouseEvent& e)
+{
+    const auto u = toUnits (e.position);
+    if (e.mods.isPopupMenu()) { showContextMenu (u); return; }
+    const auto h = hitAt (u);
+    auto toggle = [this] (const char* id)
+    {
+        if (auto* prm = proc.apvts.getParameter (id))
+        {
+            prm->beginChangeGesture(); prm->setValueNotifyingHost (prm->getValue() > 0.5f ? 0.0f : 1.0f); prm->endChangeGesture();
+        }
+    };
+    auto setProgram = [this] (int i)
+    {
+        proc.setCurrentProgram ((i + InfiniteBowProcessor::numFactoryPresets) % InfiniteBowProcessor::numFactoryPresets);
+        proc.updateHostDisplay (AudioProcessorListener::ChangeDetails().withProgramChanged (true));
+        repaint();
+    };
+    switch (h.kind)
+    {
+        case HitKind::knob:
+            dragKnob = h.index; dragLastY = e.position.y;
+            if (auto* prm = knobParam (h.index)) prm->beginChangeGesture();
+            break;
+        case HitKind::mode:  toggle ("layer"); break;
+        case HitKind::voice:
+            if (auto* prm = proc.apvts.getParameter ("mode"))
+            { prm->beginChangeGesture(); prm->setValueNotifyingHost (prm->convertTo0to1 ((float) h.index)); prm->endChangeGesture(); }
+            break;
+        case HitKind::preset:     setProgram (h.index); break;
+        case HitKind::presetPrev: setProgram (preset - 1); break;
+        case HitKind::presetNext: setProgram (preset + 1); break;
+        case HitKind::presetName:
+            if (statusAlpha > 0.0f) { statusUntil = 0.0; learnLine.clear(); }  // un clic fait revenir la barre de presets
+            else showPresetMenu();
+            break;
+        case HitKind::bow:  footDown[0] = true; toggle ("bow");  askRepaint (Rectangle<float> (150.0f, 150.0f).withCentre (foot[0])); break;
+        case HitKind::hold: footDown[1] = true; toggle ("hold"); askRepaint (Rectangle<float> (150.0f, 150.0f).withCentre (foot[1])); break;
+        default: break;
+    }
+}
+
+void InfiniteBowEditor::mouseDrag (const MouseEvent& e)
+{
+    if (dragKnob < 0) return;
+    const float range = 250.0f * k() * (e.mods.isShiftDown() ? 5.0f : 1.0f);
+    const float dy = e.position.y - dragLastY; dragLastY = e.position.y;
+    if (auto* prm = knobParam (dragKnob)) setKnob (dragKnob, prm->getValue() - dy / range, true);
+}
+
+void InfiniteBowEditor::mouseUp (const MouseEvent&)
+{
+    if (dragKnob >= 0) if (auto* prm = knobParam (dragKnob)) prm->endChangeGesture();
+    dragKnob = -1;
+    for (int i = 0; i < 2; ++i)
+        if (footDown[i]) { footDown[i] = false; askRepaint (Rectangle<float> (150.0f, 150.0f).withCentre (foot[i])); }
+}
+
+void InfiniteBowEditor::mouseDoubleClick (const MouseEvent& e)
+{
+    const auto h = hitAt (toUnits (e.position));
+    if (h.kind == HitKind::knob && ! e.mods.isPopupMenu())
+        if (auto* prm = knobParam (h.index)) setKnob (h.index, prm->getDefaultValue(), false);
+}
+
+void InfiniteBowEditor::mouseWheelMove (const MouseEvent& e, const MouseWheelDetails& w)
+{
+    const auto h = hitAt (toUnits (e.position));
+    if (h.kind == HitKind::knob)
+        if (auto* prm = knobParam (h.index)) setKnob (h.index, prm->getValue() + w.deltaY * 0.05f, false);
+}
+
+//==============================================================================
+//  Menus (design d'Octopus), toujours ouverts a l'endroit du clic
+//==============================================================================
 void InfiniteBowEditor::handleMidiMenu (int r)
 {
     const int n = InfiniteBowProcessor::numLearn;
-    if (r >= 1000 && r < 1000 + n)
-        proc.learnTarget.store (proc.learnTarget.load() == r - 1000 ? -1 : r - 1000);   // re-cliquer annule
+    if (r >= 1000 && r < 1000 + n) proc.learnTarget.store (proc.learnTarget.load() == r - 1000 ? -1 : r - 1000);
     else if (r >= 1100 && r < 1100 + n)
     {
         proc.ccMap[r - 1100].store (-1);
@@ -833,49 +769,55 @@ void InfiniteBowEditor::handleMidiMenu (int r)
     else if (r == 1211) proc.midiFsToggle.store (true);
 }
 
-void InfiniteBowEditor::showContextMenu (int learnIdx)
+void InfiniteBowEditor::showContextMenu (Point<float> u)
 {
-    const auto dash = juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x94"));
-    auto ccText = [this, dash] (int i)
-    {
-        const int cc = proc.ccMap[i].load();
-        return cc >= 0 ? "CC " + juce::String (cc) : dash;
-    };
+    using namespace NineHandsMenu;
+    const int learnIdx = learnIndexFor (hitAt (u));
+    const Colour accent = layerB ? cyan : orange;
+    auto ccText = [this] (int i) { const int cc = proc.ccMap[i].load(); return cc >= 0 ? "CC " + String (cc) : String ("not assigned"); };
     const int lt = proc.learnTarget.load();
 
-    juce::PopupMenu m;
-    // clic droit sur une commande : MIDI Learn de cette commande en tête du menu
+    PopupMenu m;
+    m.setLookAndFeel (&menuLnf);
     if (learnIdx >= 0)
     {
-        const juce::String name = InfiniteBowProcessor::learnDef (learnIdx).name;
-        m.addSectionHeader (name);
-        m.addItem (1000 + learnIdx, "MIDI Learn: " + name + " (" + ccText (learnIdx) + ")", true, lt == learnIdx);
+        const String name = InfiniteBowProcessor::learnDef (learnIdx).name;
+        const int type = InfiniteBowProcessor::learnDef (learnIdx).type;
+        addHeader (m, menuLnf.f, type == InfiniteBowProcessor::learnContinuous ? icoKnob : type == InfiniteBowProcessor::learnFootswitch ? icoPedal : icoSwitch,
+                   accent, name, "MIDI: " + ccText (learnIdx));
+        m.addItem (1000 + learnIdx, "MIDI Learn: " + name, true, lt == learnIdx);
         m.addItem (1100 + learnIdx, "Clear MIDI: " + name, proc.ccMap[learnIdx].load() >= 0);
         if (lt >= 0) m.addItem (1200, "Cancel MIDI learn");
         m.addSeparator();
     }
+    else
+        addHeader (m, menuLnf.f, icoPedal, accent, "Arc", "Electronic bow  v" + String (JucePlugin_VersionString));
 
-    const float cur = (float) getHeight() / ((float) imgH * baseScale);   // taille actuelle de la fenêtre
+    PopupMenu sizes, defSizes;
     {
-        // Plugin size : taille de cette fenêtre + taille par défaut des nouvelles fenêtres (comme Octopus)
         const char* labels[numSizes] = { "60 %", "75 %", "100 %" };
         const int def = WigaWindowSize::defaultIndex (JucePlugin_Name, numSizes);
-        juce::PopupMenu sizes, defSizes;
         for (int i = 0; i < numSizes; ++i)
         {
-            sizes.addItem (i + 1, juce::String (labels[i]) + (i == def ? "  (default)" : ""), true, std::abs (cur - sizeScale (i)) < 0.01f);
+            sizes.addItem (1 + i, String (labels[i]) + (i == def ? "  (default)" : ""), true, std::abs (getHeight() - sizeHeight (i)) <= 2);
             defSizes.addItem (20 + i, labels[i], true, i == def);
         }
         sizes.addSeparator();
         sizes.addSubMenu ("Default size (new windows)", defSizes);
-        m.addSubMenu ("Plugin size", sizes);
     }
+    m.addSubMenu ("Plugin size", sizes);
+    PopupMenu glowM;
+    {
+        const int now = roundToInt (glow * 100.0f);
+        for (int i = 0; i < NineHandsGlow::numSteps; ++i)
+            glowM.addItem (40 + i, String (NineHandsGlow::steps[i]) + " %", true, now == NineHandsGlow::steps[i]);
+    }
+    m.addSubMenu ("Glow", glowM);
     m.addSeparator();
 
-    juce::PopupMenu midi;
+    PopupMenu midi;
     for (int i = 0; i < InfiniteBowProcessor::numLearn; ++i)
-        midi.addItem (1000 + i, "Learn: " + juce::String (InfiniteBowProcessor::learnDef (i).name) + " (" + ccText (i) + ")",
-                      true, lt == i);
+        midi.addItem (1000 + i, "Learn: " + String (InfiniteBowProcessor::learnDef (i).name) + "  (" + ccText (i) + ")", true, lt == i);
     midi.addSeparator();
     if (lt >= 0) midi.addItem (1200, "Cancel MIDI learn");
     midi.addItem (1201, "Clear all MIDI assignments");
@@ -884,16 +826,40 @@ void InfiniteBowEditor::showContextMenu (int learnIdx)
     midi.addItem (1211, "MIDI footswitches momentary (toggle each press)", true, proc.midiFsToggle.load());
     m.addSubMenu ("MIDI", midi);
 
-    m.showMenuAsync (juce::PopupMenu::Options().withMousePosition(),
-                     [safe = juce::Component::SafePointer<InfiniteBowEditor> (this)] (int r)
-                     {
-                         if (safe == nullptr || r <= 0) return;
-                         if (r <= numSizes) safe->applyScale (sizeScale (r - 1));
-                         else if (r >= 20 && r < 20 + numSizes)
-                         {
-                             WigaWindowSize::setDefaultIndex (JucePlugin_Name, r - 20);   // toutes les nouvelles fenêtres de ce plugin
-                             safe->applyScale (sizeScale (r - 20));                       // et cette fenêtre tout de suite
-                         }
-                         else if (r >= 1000) safe->handleMidiMenu (r);
-                     });
+    m.showMenuAsync (PopupMenu::Options().withMousePosition(),
+        [safe = Component::SafePointer<InfiniteBowEditor> (this)] (int r)
+        {
+            if (safe == nullptr || r <= 0 || r == 9001) return;
+            if (r <= numSizes) safe->applyScale ((float) sizeHeight (r - 1) / (float) safe->maxH);
+            else if (r >= 20 && r < 20 + numSizes)
+            {
+                WigaWindowSize::setDefaultIndex (JucePlugin_Name, r - 20);
+                safe->applyScale ((float) sizeHeight (r - 20) / (float) safe->maxH);
+            }
+            else if (r >= 40 && r < 40 + NineHandsGlow::numSteps)
+            {
+                NineHandsGlow::setPercent (JucePlugin_Name, NineHandsGlow::steps[r - 40]);
+                safe->glow = (float) NineHandsGlow::steps[r - 40] / 100.0f;
+                safe->repaint();
+            }
+            else if (r >= 1000) safe->handleMidiMenu (r);
+        });
+}
+
+void InfiniteBowEditor::showPresetMenu()
+{
+    PopupMenu m;
+    m.setLookAndFeel (&menuLnf);
+    NineHandsMenu::addHeader (m, menuLnf.f, NineHandsMenu::icoPreset, layerB ? cyan : orange, "Presets", presetText());
+    for (int i = 0; i < InfiniteBowProcessor::numFactoryPresets; ++i)
+        m.addItem (100 + i, String (i + 1) + ". " + InfiniteBowProcessor::factoryPresets[i].name, true, i == preset);
+    const auto area = (screenTop * k()).getSmallestIntegerContainer();
+    m.showMenuAsync (PopupMenu::Options().withTargetScreenArea (localAreaToGlobal (area)),
+        [safe = Component::SafePointer<InfiniteBowEditor> (this)] (int r)
+        {
+            if (safe == nullptr || r < 100) return;
+            safe->proc.setCurrentProgram (r - 100);
+            safe->proc.updateHostDisplay (AudioProcessorListener::ChangeDetails().withProgramChanged (true));
+            safe->repaint();
+        });
 }

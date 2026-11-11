@@ -1,4 +1,4 @@
-# ARC (NINE HANDS | DSP) - notice PDF bilingue (partie anglaise complete, puis partie francaise complete).
+# ARC (NINE HANDS | DSP) - notice PDF, en francais uniquement.
 # Usage : python3 tools/manual.py [fichier PDF de sortie]   (defaut : docs/ARC_Manual_EN-FR_v<VERSION>.pdf)
 # Illustrations : tools/manual_assets/ (rendus reels du plugin et courbes mesurees sur le moteur, repris de la notice 2.6.0 ;
 # aucune ne montre le menu clic droit). Polices : assets/fonts (Poppins, DejaVu Sans pour les symboles).
@@ -29,7 +29,7 @@ from reportlab.lib.fonts import addMapping
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS = os.path.join(ROOT, "tools", "manual_assets")
 FONTS = os.path.join(ROOT, "assets", "fonts")
-OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "docs", NAME + "_Manual_EN-FR_v" + VERSION + ".pdf")
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "docs", NAME + "_Notice_v" + VERSION + ".pdf")
 
 for n, f in (("Pop", "Poppins-Regular"), ("PopL", "Poppins-Light"), ("PopM", "Poppins-Medium"), ("PopB", "Poppins-Bold"),
              ("Dej", "DejaVuSans")):
@@ -85,14 +85,14 @@ def side(left, right, wl):
 
 W = A4[0] - 36 * mm
 def cover(t, cover_img, cover_w):
-    return [Spacer(1, 2 * mm), P(t["lang"], "coverlang"), Spacer(1, 6 * mm), img(cover_img, cover_w), Spacer(1, 4 * mm),
-            P(" ".join(TITLE), "cover"), Spacer(1, 2 * mm), P(t["sub"], "coversub"), Spacer(1, 1 * mm), P(t["ver"], "coverver"),
-            Spacer(1, 7 * mm), img("logo_white.png", 46 * mm), NextPageTemplate("p"), PageBreak()]
+    return [Spacer(1, 38 * mm), img(cover_img, cover_w), Spacer(1, 12 * mm),
+            P(" ".join(TITLE), "cover"), Spacer(1, 3 * mm), P(t["ver"], "coverver"),
+            Spacer(1, 16 * mm), img("logo_white.png", 46 * mm), NextPageTemplate("p"), PageBreak()]
 
 def build(sections, title):
     doc = BaseDocTemplate(OUT, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=17 * mm, bottomMargin=18 * mm,
                           title=title, author="NINE HANDS | DSP")
-    lang = {"v": "en"}
+    lang = {"v": "fr"}
     def deco(c, d):
         c.saveState()
         c.setFillColor(ACC); c.rect(0, A4[1] - 2.2 * mm, A4[0], 2.2 * mm, stroke=0, fill=1)
@@ -127,147 +127,6 @@ PRESET_VALUES = [  # Attack, Release, Voice, Position, Tone, Life, Glide, Buzz, 
 PV_HDR = ["#", "Attack", "Release", "Voice", "Position", "Tone", "Life", "Glide", "Buzz", "Dry", "Bow", "Space", "Feedb."]
 
 T = {
-"en": dict(
- lang="ENGLISH", sub="Electromagnetic bow simulator<br/>VST3 for Windows and macOS &nbsp;·&nbsp; AU for macOS", ver="User manual &nbsp;·&nbsp; version " + VERSION,
- in_t="1. Introduction",
- intro=["<b>ARC</b> turns your guitar into a bowed instrument. Inspired by the <b>EBow</b>, the hand-held electronic bow, it recreates its sound: notes that swell in without any pick attack, sustain for as long as you like, and can bloom into harmonics or into a controlled, recordable feedback tone.",
-        "An electronic bow is a small device held over the string: a pickup coil listens to the string, an amplifier boosts the signal and a driver coil pushes the string back with a magnetic field, so the string keeps vibrating forever. ARC does the same thing on a <b>virtual string</b>: it detects the note you play, tunes a modelled string to it, excites it with your real string, then keeps it alive with the same “pickup &gt; amplifier &gt; driver” loop, with automatic gain control so it never runs away.",
-        "<b>Signal path.</b> Guitar in (mono or stereo) &gt; tracking (pitch by YIN, picks and mutes) &gt; virtual string (tuned waveguide, endless sustain) &gt; VOICE and POSITION (harmonics, bow placement, feedback) &gt; SPACE (reverb on the bowed sound) &gt; mix of DRY and BOW LEVEL &gt; OUTPUT.",
-        "ARC is <b>monophonic</b>, like a real electronic bow: play one note at a time and it follows you. Re-picking the same note keeps the bowed sound continuous (the virtual string is gently re-synchronised, no “poc” and no drop-out); a new note changes pitch without any silence."],
- pluck_cap="A plucked note dies away; through ARC it swells in, holds, follows the hammer-on and stops when you mute the string (measured on the ARC engine).",
- qs_t="Quick start",
- qs=["Insert ARC <b>first</b> on your guitar track, before any distortion, modulation or delay.",
-     "Preset 1 <b>Classic Bow</b> is loaded by default. Play a single note and let it ring: the sound swells in and holds. The note readout (for example A2 / 110.0 Hz) and the BOWING state confirm that ARC is tracking you.",
-     "To stop the note, mute the string with your palm, or press the BOW footswitch to bypass ARC.",
-     "Press <b>MODE</b>: the LED turns blue and the knobs now adjust the blue settings. Press again to go back to orange."],
- ins_t="2. Installation",
- ins=[("Windows", "Copy <b>Arc.vst3</b> (artifact <b>Arc-Windows-VST3</b>) into <b>C:\\Program Files\\Common Files\\VST3\\</b>, then rescan the plugins in your DAW."),
-      ("macOS", "From the artifact <b>Arc-macOS-VST3-AU</b> (universal binary, Apple Silicon and Intel), copy <b>Arc.vst3</b> into <b>~/Library/Audio/Plug-Ins/VST3/</b> and <b>Arc.component</b> (Audio Unit) into <b>~/Library/Audio/Plug-Ins/Components/</b>. The plugin is not notarized: if macOS blocks it, run <b>xattr -cr</b> followed by the plugin path in Terminal."),
-      ("Reaper", "Options &gt; Preferences &gt; Plug-ins &gt; VST &gt; <b>Re-scan</b>. ARC is listed as <b>Arc</b> by <b>NINE HANDS | DSP</b>. To control it from a MIDI pedal board, record-arm the track with your MIDI input (or use a MIDI send) so the plugin receives MIDI.")],
- ov_t="3. Interface overview",
- ov=[["#", "Control", "#", "Control"], ["1", "ATTACK / RELEASE", "8", "MODE button and LED"], ["2", "SUSTAIN / SENS", "9", "VOICE selector (NORMAL, HARM, HARM+)"],
-     ["3", "POSITION / BUZZ", "10", "Status line"], ["4", "TONE", "11", "String display"], ["5", "LIFE / GLIDE", "12", "Presets 1–8"],
-     ["6", "BOW LEVEL / DRY", "13", "BOW footswitch (effect on / bypass)"], ["7", "SPACE / OUTPUT", "14", "HOLD footswitch"]],
- ov_note="Drag a knob to set it, double-click it to reset the active setting to its default. <b>Right-click a control</b> for its MIDI Learn menu (section 6); right-click elsewhere for <b>Plugin size</b> and the <b>MIDI</b> menu. The side jacks (MONO / L, OUTPUTS R, INPUTS, MOD, EXP) are decorative: audio and MIDI are routed by your DAW.",
- c_t="4. The controls one by one",
- mode_t="The MODE button and dual-function knobs",
- mode=["ARC has 7 knobs but 13 settings. Under each knob two settings are printed: the <b>orange</b> one on top, the <b>blue</b> one below. The MODE button chooses which of the two the knobs control.",
-       "MODE LED orange: the knobs adjust the orange settings, their arcs and the status line are orange. MODE LED blue: they adjust the blue settings, arcs and status line turn blue.",
-       "Each setting keeps its own value: when you switch MODE, every knob jumps to the value of the other setting, nothing is overwritten. TONE is a single-function knob with a white arc: it controls tone in both modes."],
- ko_cap="MODE orange: orange arcs, orange settings.", kb_cap="MODE blue: blue arcs, blue settings.",
- set_t="Settings",
- sets=[["Knob", "Setting", "Range", "What it does", "Default"],
-       ["1", "ATTACK", "10 ms – 4 s", "Time for the bowed note to swell in. Short = immediate, long = slow violin-like swell.", "600 ms"],
-       ["1", "RELEASE", "20 ms – 5 s", "Fade-out time when you mute the string.", "400 ms"],
-       ["2", "SUSTAIN", "0–100 %", "At maximum (“Infinite”) the note holds forever; lower values let it die away 0.3 to 20 s after the real string falls silent.", "Infinite"],
-       ["2", "SENS", "−70 to −20 dB", "Detection threshold. Lower it if soft notes are missed, raise it if string noise triggers notes.", "−45 dB"],
-       ["3", "POSITION", "0–100 %", "Where the bow sits: near the bridge (0 %) bright and nasal, middle of the string (100 %) hollow, clarinet-like.", "25 %"],
-       ["3", "BUZZ", "0–100 %", "The string rattles against the bow, for gritty, buzzing tones.", "0 %"],
-       ["4", "TONE", "0–100 %", "Brightness of the virtual string; it follows the note so the timbre stays even across the neck.", "50 %"],
-       ["5", "LIFE", "0–100 %", "Gentle vibrato (about 5 Hz) and small natural instabilities of pitch and level.", "30 %"],
-       ["5", "GLIDE", "1–600 ms", "Portamento when the note jumps (hammer-on, pull-off, slide). Bends and finger vibrato are never slowed down.", "40 ms"],
-       ["6", "BOW LEVEL", "0–100 %", "Level of the bowed sound.", "80 %"],
-       ["6", "DRY", "0–100 %", "Level of your direct guitar. At 0 % you get a pure bowed sound with no pick attack.", "0 %"],
-       ["7", "SPACE", "0–100 %", "Reverb on the bowed sound only.", "25 %"],
-       ["7", "OUTPUT", "−24 to +12 dB", "Final output level.", "0 dB"]],
- voice_t="VOICE",
- voice=["<b>NORMAL</b>: the string is bowed on its fundamental.", "<b>HARM</b>: the string vibrates on its 2nd harmonic, one octave up.",
-        "<b>HARM+</b>: the string vibrates on its 3rd harmonic, an octave and a fifth up."],
- bend_t="Bends, vibrato, glide and re-picking",
- bend=["Bends and finger vibrato are followed within about 15 ms, whatever the GLIDE setting. Note jumps (hammer-ons, pull-offs, slides to another fret) use GLIDE. ARC tells them apart automatically: a pitch that moves continuously is a bend, a pitch that jumps is a new note.",
-       "Bends are followed while the real string can be heard above the SENS threshold. If the string has died away but ARC still holds the note, bend while the string rings, or lower SENS.",
-       "Picking again does not cut the virtual string: the same note stays continuous (soft re-synchronisation), another note changes without silence, with no double trigger after the attack. A mute is confirmed over 20 ms before the note stops, and the pick click never enters the bow loop."],
- bend_cap="Even with GLIDE at 250 ms, ARC follows a whole-tone bend and its release closely (measured on the ARC engine).",
- fs_t="5. Footswitches, LEDs and display",
- fs=["<b>BOW</b>: effect on (LED lit) or bypass (LED off). In bypass your guitar passes through untouched, at its original level whatever DRY, BOW LEVEL and OUTPUT; the display shows BYPASS. The switch-over is a short crossfade, with no click and no drop.",
-     "<b>HOLD</b>: infinite hold that ignores muting, for drones and pads. A MIDI control learned on HOLD (for example the sustain pedal of a MIDI keyboard) engages HOLD while pressed (section 6)."],
- led=[["LED", "Behaviour"], ["MODE", "Orange or blue: which settings the knobs control."], ["NORMAL / HARM / HARM+", "Only the selected voice is lit."],
-      ["PRESETS 1–8", "Only the loaded preset is lit: orange for 1–4, cyan for 5–8."], ["BOW", "Lit while the effect is on; its brightness breathes with the string."],
-      ["HOLD", "Lit when HOLD is on, from the footswitch or from MIDI."]],
- sl_t="Status line and string display",
- sl=["The <b>status line</b> under the ARC logo shows the last setting touched, its value and MIDI equivalent (0–127), for example <b>ATTACK 600 ms (MIDI 59)</b>, then the last CC received (<b>CC20=59</b>) and <b>HOLD</b> when HOLD is engaged by MIDI. Its colour follows MODE. During MIDI Learn it shows the learn messages.",
-     "The <b>string display</b> vibrates with 1, 2 or 3 antinodes depending on VOICE, its glow follows the level; the BOW block moves with POSITION. On the right: detected note, frequency and state: IDLE, LISTENING, BOWING, RELEASE, BYPASS, or FEEDBACK x5 when the Larsen effect has taken over."],
- sl_cap="Status line and string display: A2 detected, bowing.",
- mi_t="6. MIDI",
- mi="Every control on the pedal can be driven by MIDI Control Change messages, on any MIDI channel. <b>No CC is assigned by default</b>: you assign each control with <b>MIDI Learn</b>. Assignments are <b>saved with the project</b>.",
- ml_t="MIDI Learn",
- ml=["<b>Right-click a control</b>: a knob (the setting currently visible, orange or blue, is the one learned), MODE, a VOICE button, a preset LED, BOW or HOLD. The top of the menu shows <b>MIDI Learn: &lt;Name&gt; (CC n)</b>, or a dash when nothing is assigned.",
-     "Choose it, then move a pedal, knob or footswitch on your controller. The status line shows <b>MIDI LEARN: move a control for &lt;Name&gt;</b>, then <b>&lt;Name&gt; = CC n</b> for two seconds. The learning CC does not change the sound.",
-     "<b>Clear MIDI: &lt;Name&gt;</b> removes the assignment; <b>Cancel MIDI learn</b> (or choosing the same Learn item again) stops waiting.",
-     "Right-click an empty area: the <b>MIDI</b> sub-menu lists <b>Learn</b> for all 18 controls with their CC, <b>Cancel MIDI learn</b>, <b>Clear all MIDI assignments</b>, and the footswitch behaviour: <b>MIDI footswitches latching (127 = on / 0 = off)</b> (default) or <b>MIDI footswitches momentary (toggle each press)</b>.",
-     "A CC drives only one control: learning a CC already used removes it from the other control. CC 120–127 are never learned.",
-     "A project saved with an earlier version that still had the old factory assignment (Hold on CC 64, nothing else) opens with no assignment; a project in which you had changed an assignment keeps its assignments."],
- lc_t="Learnable controls",
- lc=[["Control", "Type"],
-     ["Attack, Release, Sustain, Sensitivity, Position, Buzz, Tone, Life, Glide, Bow Level, Dry, Space, Output", "Continuous (0–127 over the whole range)"],
-     ["Mode button", "Toggle: ≥ 64 = blue settings, &lt; 64 = orange"], ["Voice", "Selector, 3 positions: 0–42 Normal, 43–85 Harm, 86–127 Harm+"],
-     ["Preset", "Selector, 8 positions: 0–127 split in 8 equal zones (presets 1 to 8)"],
-     ["Bow footswitch", "Footswitch: latching (≥ 64 = on, &lt; 64 = bypass) or momentary (each press toggles)"],
-     ["Hold footswitch", "Footswitch: latching (held while ≥ 64, like a sustain pedal) or momentary (each press toggles)"]],
- mb=["MIDI HOLD adds to the HOLD footswitch on screen. Clearing the Hold assignment also releases a MIDI hold.",
-     "ARC does not use Program Change: select presets with a learned CC, or with your DAW’s program menu (the 8 presets are listed with their names).",
-     "Every setting is also a separate DAW parameter that can be automated, including those sharing a knob: the 13 settings, Voice, Knob Mode (Orange / Cyan), Bow, Hold and the hidden Feedback (see the Larsen preset).",
-     "Values received by MIDI are handed to the host by a timer, never from the audio thread (anti-freeze)."],
- sc=[("status_cc.png", "A setting and the last CC received"), ("status_learn.png", "MIDI Learn waiting for a CC"),
-     ("status_assigned.png", "Assignment confirmed (2 s)"), ("status_hold.png", "HOLD engaged by MIDI (here a sustain pedal learned on Hold)")],
- w_t="7. Window",
- w=["ARC opens at its default size, <b>60 %</b> at first, the same default size as Ring Think and the other NINE HANDS | DSP pedals, and the window can never be made smaller than 60 %, even if your DAW tries to resize it.",
-    "Right-click the pedal &gt; <b>Plugin size</b>: <b>60 %</b>, <b>75 %</b> or <b>100 %</b> (the current size is ticked); <i>(default)</i> is shown next to the default size. You can also drag the window edge anywhere between 60 % and 100 %; the pedal keeps its proportions.",
-    "<b>Plugin size &gt; Default size (new windows)</b> chooses the size at which every new ARC window opens. This setting is common to all instances and saved on your computer (<i>settings.xml</i> in the NINE HANDS | DSP\\Arc folder of your user data: %APPDATA% on Windows, ~/Library on macOS); the open window takes that size at once.",
-    "A size chosen for an instance (from the menu or by dragging the edge) is remembered with its project and stays the priority for that instance when the project is reopened. An instance whose size was never changed is not tied to a size: it always opens at the current default size."],
- pr_t="8. Presets",
- pr="Click a preset LED (or its number) to load it. Your DAW also sees the 8 presets as programs with their names. To keep your own settings, save the plugin state in your DAW. All presets use SUSTAIN Infinite, SENS −45 dB and OUTPUT 0 dB.",
- pl=[["#", "Preset", "Character"], ["1", "Classic Bow", "The reference bowed sound: medium swell, infinite sustain, a touch of space."],
-     ["2", "Violin Swell", "Slow swell near the bridge, lively vibrato: lyrical, string-like lines."],
-     ["3", "Ethereal Flute", "HARM voice, hollow mid-string position, dark tone and lots of space."],
-     ["4", "Octave Choir", "HARM voice with a little dry signal and long reverb: a soft octave choir."],
-     ["5", "Fifth Shimmer", "HARM+ voice: an octave-and-fifth halo over each note."],
-     ["6", "Buzz Drone", "Fast attack right at the bridge, heavy BUZZ: gritty, sitar-like drones."],
-     ["7", "Slide Lead", "Fast bow, long GLIDE between notes, some dry signal: singing lead lines."],
-     ["8", "Larsen", "Simulated guitar feedback: each held note blooms into its own harmonic."]],
- pv_t="Preset values",
- la_t="The Larsen preset (simulated feedback)",
- la=["Play and hold a note: for about one second you hear the bowed note (and a little dry guitar), then it <b>blooms</b>: the bowed sound fades while a harmonic grows, with the slow breathing of real feedback.",
-     "The harmonic is the one closest to the resonances of a virtual amp and room, so it depends on the note you play. Two different notes in a row never bloom on the same harmonic, and the resonances drift slowly.",
-     "Change note, re-pick or slide: the feedback falls back, then blooms again on the harmonic of the new note.",
-     "Bend while it feeds back: it wavers, then jumps to the harmonic that catches better (sometimes several times on a long bend); a wide vibrato between two zones makes it flutter. Bring the string back to its starting pitch and the original harmonic returns, without re-picking.",
-     "Bends are followed down to about 30 dB below SENS (hum ignored), and a hard attack catches faster (about 1.2 s against 2.4 s). The display shows <b>FEEDBACK x5</b> (for example) when the harmonic has taken over.",
-     "<b>Safe by design</b>: nothing is sent back to your amp, no real feedback loop can form; the feedback level is matched to the normal bowed sound and a soft limiter caps the peaks. The amount is the hidden <b>Feedback</b> parameter (0–100 %, 85 % in the preset), automatable in your DAW and usable with any other setting."],
- ld_cap="Preset 8 Larsen: the display shows FEEDBACK x5 once the 5th harmonic has taken over.",
- lb_cap="Measured on the ARC engine: the bowed note fades while the feedback harmonic grows, then holds.",
- lv_cap="Measured on the ARC engine: during a slow bend the feedback jumps between harmonics; a wide vibrato makes it flutter.",
- ten_t="Ten notes played in a row through the Larsen preset",
- ten=[["Note played", "Feedback on", "Frequency"], ["E2 (82 Hz)", "6th harmonic", "494 Hz"], ["A2 (110 Hz)", "4th harmonic", "440 Hz"],
-      ["D3 (147 Hz)", "3rd harmonic", "440 Hz"], ["G3 (196 Hz)", "4th harmonic", "784 Hz"], ["B3 (247 Hz)", "2nd harmonic", "494 Hz"],
-      ["E4 (330 Hz)", "4th harmonic", "1319 Hz"], ["A3 (220 Hz)", "6th harmonic", "1320 Hz"], ["E3 (165 Hz)", "3rd harmonic", "494 Hz"],
-      ["B2 (123 Hz)", "4th harmonic", "494 Hz"], ["C4 (262 Hz)", "2nd harmonic", "523 Hz"]],
- ten_note="Each note blooms on its own harmonic and two consecutive notes never share one. The resonances drift slowly, so another take may differ slightly.",
- tp_t="9. Tips",
- tp=["In Reaper, put ARC <b>first</b> in the FX chain, before your amp simulator and any drive, modulation or delay: the tracking needs a clean, direct guitar signal. Distortion and delay sound great <b>after</b> ARC.",
-     "Neck pickup, clean tone, guitar volume up, one note at a time: the most reliable tracking.",
-     "Low tunings are tracked down to G#1 (52 Hz): baritone, <b>7-string</b> and drop tunings. On a low B or A string keep POSITION around 25–40 % and TONE a little higher for definition; HARM gives a cello-like octave above the low string.",
-     "Swell chords note by note with HOLD on, then layer them with SPACE. Slide slowly on one string with a long GLIDE for cello-like phrases.",
-     "Assign BOW and HOLD to a MIDI foot controller with MIDI Learn, and an expression pedal to BOW LEVEL or SPACE for swells.",
-     "Record the Larsen preset at low volume and blend it under a distorted part."],
- ts_t="Troubleshooting",
- ts=[["Symptom", "Solution"],
-     ["No sound from the bow", "BOW LED lit and BOW LEVEL up? Play a clear single note; the state should go LISTENING then BOWING."],
-     ["Soft notes are not detected", "Lower SENS (blue setting of knob 2)."], ["Notes start by themselves", "Raise SENS, or mute the strings you are not playing."],
-     ["Wrong or jumping notes", "One note at a time, neck pickup, clean tone, ARC first in the chain."],
-     ["The note never stops", "SUSTAIN at Infinite: mute the string, press BOW, or turn HOLD off (check any MIDI control learned on Hold, such as a sustain pedal)."],
-     ["The knobs do not change what I expect", "Check the MODE LED: orange controls the orange settings, blue the blue ones."],
-     ["My MIDI pedal does nothing", "No CC is assigned by default: learn it (right-click the control &gt; MIDI Learn). Check that the DAW sends MIDI to the plugin and watch the status line (last CC received)."],
-     ["A MIDI footswitch needs two presses", "Choose “MIDI footswitches momentary (toggle each press)” in the MIDI sub-menu."]],
- sp_t="10. Technical specifications",
- sp=[["Formats", "VST3 (Windows 64-bit, macOS), AU (macOS), universal Apple Silicon + Intel; listed as “Arc” by “NINE HANDS | DSP”"],
-     ["Channels", "Mono or stereo in, mono or stereo out; MIDI input"], ["Sample rates", "44.1 to 192 kHz"], ["Latency", "0 samples"],
-     ["Tracking", "Monophonic, about 48 Hz (G#1) to 1.4 kHz"], ["CPU", "About 3 % of one core for the bow engine (measured offline)"],
-     ["Parameters", "18, all automatable (13 settings, Voice, Knob Mode, Bow, Hold, Feedback)"],
-     ["MIDI", "MIDI Learn on 18 controls (CC), no CC assigned by default, latching or momentary footswitch mode, assignments saved with the project"],
-     ["Presets", "8 factory presets"],
-     ["Window", "Plugin size 60 % / 75 % / 100 %, default size of new windows to choose (60 % at first), never smaller than 60 %; proportions kept"],
-     ["Stability", "Windows anti-freeze v2: software renderer, caches rebuilt by the timer, redraw watchdog, no host call from the audio thread"],
-     ["Version", VERSION]]),
 "fr": dict(
  lang="FRANÇAIS", sub="Simulateur d'archet électromagnétique<br/>VST3 pour Windows et macOS &nbsp;·&nbsp; AU pour macOS", ver="Notice d'utilisation &nbsp;·&nbsp; version " + VERSION,
  in_t="1. Présentation",
@@ -287,9 +146,9 @@ T = {
       ("Reaper", "Options &gt; Preferences &gt; Plug-ins &gt; VST &gt; <b>Re-scan</b>. ARC apparaît sous le nom <b>Arc</b>, fabricant <b>NINE HANDS | DSP</b>. Pour le piloter depuis un pédalier MIDI, armez la piste avec votre entrée MIDI (ou utilisez un envoi MIDI) afin que le plugin reçoive le MIDI.")],
  ov_t="3. Vue d'ensemble de l'interface",
  ov=[["#", "Commande", "#", "Commande"], ["1", "ATTACK / RELEASE", "8", "Bouton MODE et sa LED"], ["2", "SUSTAIN / SENS", "9", "Sélecteur VOICE (NORMAL, HARM, HARM+)"],
-     ["3", "POSITION / BUZZ", "10", "Ligne d'état"], ["4", "TONE", "11", "Écran de corde"], ["5", "LIFE / GLIDE", "12", "Presets 1 à 8"],
+     ["3", "POSITION / BUZZ", "10", "Écran du haut : presets et ligne d'état"], ["4", "TONE", "11", "Écran de corde"], ["5", "LIFE / GLIDE", "12", "Presets 1 à 8"],
      ["6", "BOW LEVEL / DRY", "13", "Footswitch BOW (effet / bypass)"], ["7", "SPACE / OUTPUT", "14", "Footswitch HOLD"]],
- ov_note="Tirez un potard pour le régler, double-cliquez pour remettre le réglage actif à sa valeur par défaut. <b>Clic droit sur une commande</b> : son menu MIDI Learn (section 6) ; clic droit ailleurs : <b>Plugin size</b> et menu <b>MIDI</b>. Les jacks des tranches (MONO / L, OUTPUTS R, INPUTS, MOD, EXP) sont décoratifs : l'audio et le MIDI passent par le DAW.",
+ ov_note="Tirez un potard pour le régler, double-cliquez pour remettre le réglage actif à sa valeur par défaut. <b>Clic droit sur une commande</b> : son menu MIDI Learn (section 6) ; clic droit ailleurs : <b>Plugin size</b>, <b>Glow</b> et menu <b>MIDI</b>. Les menus s'ouvrent là où vous cliquez. Les jacks des tranches (OUT L / OUT R à gauche, IN L / IN R à droite) sont décoratifs : l'audio et le MIDI passent par le DAW.",
  c_t="4. Les commandes une par une",
  mode_t="Le bouton MODE et les potards doubles",
  mode=["ARC a 7 potards mais 13 réglages. Sous chaque potard, deux réglages sont écrits : le réglage <b>orange</b> en haut, le réglage <b>bleu</b> en dessous. Le bouton MODE choisit lequel des deux les potards pilotent.",
@@ -325,15 +184,16 @@ T = {
  led=[["LED", "Comportement"], ["MODE", "Orange ou bleue : quels réglages les potards pilotent."], ["NORMAL / HARM / HARM+", "Seule la voix choisie est allumée."],
       ["PRESETS 1–8", "Seul le preset chargé est allumé : orange pour 1 à 4, cyan pour 5 à 8."], ["BOW", "Allumée quand l'effet est actif ; sa luminosité respire avec la corde."],
       ["HOLD", "Allumée quand HOLD est actif, par le footswitch ou par le MIDI."]],
- sl_t="Ligne d'état et écran de corde",
- sl=["La <b>ligne d'état</b> sous le logo ARC affiche le dernier réglage touché, sa valeur et son équivalent MIDI (0–127), par exemple <b>ATTACK 600 ms (MIDI 59)</b>, puis le dernier CC reçu (<b>CC20=59</b>) et <b>HOLD</b> quand HOLD est tenu par le MIDI. Sa couleur suit MODE. Pendant un MIDI Learn, elle affiche les messages d'apprentissage.",
+ sl_t="Les deux écrans",
+ sl=["L'<b>écran du haut</b> montre au repos la <b>barre de presets</b> : ◄ numéro et nom du preset ►. Les flèches passent au preset précédent ou suivant, un clic sur le nom ouvre la liste des presets.",
+     "Dès qu'un réglage bouge (souris, molette, automation, MIDI), la <b>ligne d'état</b> prend la place de la barre de presets : dernier réglage touché, sa valeur et son équivalent MIDI (0–127), par exemple <b>ATTACK 600 ms (MIDI 59)</b>, puis le dernier CC reçu (<b>CC20=59</b>) et <b>HOLD</b> quand HOLD est tenu par le MIDI. Sa couleur suit MODE. Elle reste 2,5 s après le dernier mouvement puis la barre de presets revient en fondu ; un clic la fait revenir tout de suite. Pendant un MIDI Learn, elle affiche les messages d'apprentissage.",
      "L'<b>écran de corde</b> vibre avec 1, 2 ou 3 ventres selon VOICE, sa lueur suit le niveau ; le bloc BOW se déplace avec POSITION. À droite : note détectée, fréquence et état : IDLE, LISTENING, BOWING, RELEASE, BYPASS, ou FEEDBACK x5 quand le larsen a pris le dessus."],
- sl_cap="Ligne d'état et écran de corde : La2 détecté, archet en jeu.",
+ sl_cap="Écran du haut (ici la ligne d'état) et écran de corde : La2 détecté, archet en jeu.",
  mi_t="6. MIDI",
  mi="Toutes les commandes de la pédale se pilotent par des messages MIDI Control Change, sur n'importe quel canal. <b>Aucun CC n'est assigné par défaut</b> : chaque commande s'assigne avec le <b>MIDI Learn</b>. Les assignations sont <b>sauvegardées avec le projet</b>.",
  ml_t="MIDI Learn",
- ml=["<b>Clic droit sur une commande</b> : un potard (c'est le réglage visible, orange ou bleu, qui est appris), MODE, un bouton VOICE, une LED de preset, BOW ou HOLD. Le haut du menu affiche <b>MIDI Learn: &lt;Nom&gt; (CC n)</b>, ou un tiret si rien n'est assigné.",
-     "Choisissez-le, puis bougez une pédale, un potard ou un footswitch de votre contrôleur. La ligne d'état affiche <b>MIDI LEARN: move a control for &lt;Nom&gt;</b>, puis <b>&lt;Nom&gt; = CC n</b> pendant deux secondes. Le CC d'apprentissage ne modifie pas le son.",
+ ml=["<b>Clic droit sur une commande</b> : un potard (c'est le réglage visible, orange ou bleu, qui est appris), MODE, un bouton VOICE, une LED de preset, BOW ou HOLD. Le haut du menu affiche le nom de la commande et son assignation (<b>MIDI: CC n</b> ou <b>not assigned</b>), puis <b>MIDI Learn: &lt;Nom&gt;</b>.",
+     "Choisissez-le, puis bougez une pédale, un potard ou un footswitch de votre contrôleur. L'écran du haut affiche <b>MIDI LEARN · &lt;NOM&gt;</b>, puis <b>&lt;NOM&gt; = CC n</b> pendant deux secondes. Le CC d'apprentissage ne modifie pas le son.",
      "<b>Clear MIDI: &lt;Nom&gt;</b> efface l'assignation ; <b>Cancel MIDI learn</b> (ou choisir de nouveau le même Learn) arrête l'attente.",
      "Clic droit sur une zone vide : le sous-menu <b>MIDI</b> liste <b>Learn</b> pour les 18 commandes avec leur CC, <b>Cancel MIDI learn</b>, <b>Clear all MIDI assignments</b>, et le comportement des footswitches : <b>MIDI footswitches latching (127 = on / 0 = off)</b> (par défaut) ou <b>MIDI footswitches momentary (toggle each press)</b>.",
      "Un CC ne pilote qu'une commande : apprendre un CC déjà utilisé le retire de l'autre commande. Les CC 120 à 127 ne sont jamais appris.",
@@ -353,6 +213,7 @@ T = {
      ("status_assigned.png", "Assignation confirmée (2 s)"), ("status_hold.png", "HOLD tenu par le MIDI (ici une pédale de sustain apprise sur Hold)")],
  w_t="7. Fenêtre",
  w=["ARC s'ouvre à sa taille par défaut, <b>60 %</b> au départ, la même taille par défaut que Ring Think et les autres pédales NINE HANDS | DSP, et la fenêtre ne peut jamais être plus petite que 60 %, même si le DAW tente de la réduire.",
+    "Clic droit &gt; <b>Glow</b> : intensité du halo des LED, des arcs des potards et des anneaux des footswitches, à 25, 50, 75 ou 100 %. Ce réglage est commun à toutes les fenêtres d'ARC et enregistré sur l'ordinateur.",
     "Clic droit sur la pédale &gt; <b>Plugin size</b> : <b>60 %</b>, <b>75 %</b> ou <b>100 %</b> (la taille actuelle est cochée) ; <i>(default)</i> est indiqué à côté de la taille par défaut. Vous pouvez aussi tirer le bord de la fenêtre entre 60 % et 100 % ; la pédale garde ses proportions.",
     "<b>Plugin size &gt; Default size (new windows)</b> choisit la taille d'ouverture de toutes les nouvelles fenêtres d'ARC. Ce réglage est commun à toutes les instances et enregistré sur l'ordinateur (<i>settings.xml</i> dans le dossier NINE HANDS | DSP\\Arc des données utilisateur : %APPDATA% sous Windows, ~/Library sous macOS) ; la fenêtre ouverte prend aussi cette taille tout de suite.",
     "Une taille choisie pour une instance (par le menu ou en tirant le bord) est mémorisée avec son projet et reste prioritaire pour cette instance à la réouverture du projet. Une instance dont la taille n'a jamais été changée n'est liée à aucune taille : elle s'ouvre toujours à la taille par défaut du moment."],
@@ -406,13 +267,13 @@ T = {
      ["Paramètres", "18, tous automatisables (13 réglages, Voice, Knob Mode, Bow, Hold, Feedback)"],
      ["MIDI", "MIDI Learn sur 18 commandes (CC), aucun CC assigné par défaut, footswitches à accrochage ou momentanés, assignations sauvegardées avec le projet"],
      ["Presets", "8 presets d'usine"],
-     ["Fenêtre", "Plugin size 60 % / 75 % / 100 %, taille par défaut des nouvelles fenêtres au choix (60 % au départ), jamais plus petite que 60 % ; proportions conservées"],
+     ["Fenêtre", "Format double, Plugin size 60 % / 75 % / 100 %, taille par défaut des nouvelles fenêtres au choix (60 % au départ), jamais plus petite que 60 % ; proportions conservées"],
      ["Stabilité", "Anti-gel v2 sous Windows : rendu logiciel, caches refaits par le timer, chien de garde du redessin, aucun appel à l'hôte depuis le thread audio"],
      ["Version", VERSION]]),
 }
 
 def section(lang):
-    t = T[lang]; f = cover(t, "cover.png", 100 * mm)
+    t = T[lang]; f = cover(t, "cover.png", 130 * mm)
     f += [P(t["in_t"], "h1")] + [P(x) for x in t["intro"]]
     f += [KeepTogether([img("chart_pluck.png", W * 0.68), P(t["pluck_cap"], "small")])]
     f += [P(t["qs_t"], "h2")] + bullets(t["qs"]) + [PageBreak()]
@@ -448,4 +309,4 @@ def section(lang):
     f += [KeepTogether([P(t["sp_t"], "h1"), table(t["sp"], [28 * mm, W - 28 * mm], header=False, first_bold=True)])]
     return f
 
-build([("en", section("en")), ("fr", section("fr"))], "ARC - User manual / Notice v" + VERSION)
+build([("fr", section("fr"))], "ARC - Notice v" + VERSION)

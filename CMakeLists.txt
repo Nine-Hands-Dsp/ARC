@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Arc VERSION 2.7.1 LANGUAGES C CXX)
+project(Arc VERSION 3.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -48,7 +48,19 @@ juce_add_plugin(Arc
 )
 
 # visuel de la pédale, intégré au plugin
-juce_add_binary_data(ArcAssets SOURCES background.jpg)
+juce_add_binary_data(ArcAssets SOURCES
+    assets/background.png
+    assets/knob_marker.png
+    assets/led_orange_160.png
+    assets/led_orange_185.png
+    assets/led_cyan_160.png
+    assets/led_cyan_185.png
+    assets/ArcLogoWhite.svg
+    assets/NineHandsLogoWhite.svg
+    assets/fonts/Poppins-Regular.ttf
+    assets/fonts/Poppins-Medium.ttf
+    assets/fonts/Poppins-Bold.ttf
+)
 
 target_sources(Arc PRIVATE
     PluginProcessor.cpp
