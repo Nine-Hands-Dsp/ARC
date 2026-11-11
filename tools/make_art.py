@@ -210,12 +210,18 @@ def cushion(a_soft, d, bev):
 for (x, y, w, h_) in VOICE_BTNS:
     a, d = rrect_alpha(x, y, x + w, y + h_, BTN_R)
     darken(img, cast_shadow(a, 160, 0.55, 0.6))
+    # occlusion : fine gorge sombre au pied du bouton + assombrissement doux autour
+    dd = np.maximum(d, 0)
+    darken(img, (0.65 * np.exp(-((d - 0.8) / 1.5) ** 2) + 0.35 * np.exp(-dd / 8.0)) * (d > -1))
     n = cushion(a, d, 11.0)
     ndl_ = np.clip((n * LIGHT).sum(2), 0, 1); sp = np.clip((n * half).sum(2), 0, 1) ** 28
     face = 30 + 14 * (1 - (yy - y) / h_)                       # face satinee, plus claire en haut
     lum = face * (0.55 + 0.6 * ndl_) + 120 * sp + 1.6 * grain
     rgb = np.dstack([lum, lum * 1.01, lum * 1.05])
     img = img * (1 - a[..., None]) + rgb * a[..., None]
+    # occlusion sur le pourtour du bouton (plus marquee en bas a droite)
+    side = np.clip(((xx - (x + w / 2)) / w + (yy - (y + h_ / 2)) / h_) * 1.2, 0, 1)
+    darken(img, a * np.clip((d + 6.0) / 6.0, 0, 1) ** 1.5 * (0.30 + 0.30 * side))
 
 # ------------------------------------------------------------------ 4. potards (photo du kit, repere efface : seul le repere dessine tourne)
 from photo_controls_arc import knob_clean, KNOB_C, KNOB_RPX, knob_marker, FS_C, FS_FLATS_PX, FS_BTN_PX, JACK_BOX
@@ -313,6 +319,19 @@ vg = np.hypot((xx - W / 2) / (W / 2), (yy - H / 2) / (H / 2))
 vign = 1.0 - 0.10 * np.clip(vg - 0.55, 0, 1) ** 1.5
 light = (falloff * vign)[..., None]
 img = img * light + (spot * 16.0)[..., None] * (0.35 + 0.65 * plate)[..., None]
+# f) etalonnage photo : lumiere de la boite legerement chaude, ombres legerement froides (lumiere d'ambiance)
+warm = np.array([1.045, 1.0, 0.94]); cool = np.array([0.95, 0.985, 1.06])
+mixw = np.clip(1.25 - 1.3 * u, 0, 1)[..., None]
+img *= warm * mixw + cool * (1 - mixw)
+# g) reflet de la boite a lumiere sur la peinture satinee : bande diagonale large et douce (gradient de lustre)
+bandp = np.exp(-(((xx * 0.80 + yy) - 0.42 * (W * 0.80 + H) * 0.62) / (0.16 * H)) ** 2)
+img += (bandp * 13.0 * plate * np.clip(1.1 - u, 0, 1))[..., None] * np.array([1.0, 1.0, 1.03])
+# h) eclat du contour : le metal mat renvoie la lumiere en haut a gauche (halo doux sur le haut et le cote gauche)
+glint = np.exp(-(((xx - 0.18 * W) / (0.30 * W)) ** 2 + ((yy - 0.02 * H) / (0.10 * H)) ** 2)) \
+      + 0.8 * np.exp(-(((xx - 0.01 * W) / (0.03 * W)) ** 2 + ((yy - 0.25 * H) / (0.30 * H)) ** 2))
+img += (glint * 26.0 * metal)[..., None]
+# i) lumiere rasante : micro-relief de la peinture poudre souligne pres de la source
+
 # d) liseres de lumiere : aretes du contour tournees vers la source (haut / gauche), plus vives
 gyo, gxo = np.gradient(cv2.GaussianBlur(dout, (0, 0), 3.0))          # gradient vers l'interieur
 rim_hl = np.exp(-((dout - 2.0) / 1.6) ** 2) * np.clip((gxo + gyo) / np.maximum(np.hypot(gxo, gyo), 1e-3) * 0.7071, 0, 1)
