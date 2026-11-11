@@ -289,7 +289,7 @@ for side, cy, _ in JACKS:
 
 # ------------------------------------------------------------------ sorties
 os.makedirs(OUT, exist_ok=True)
-BRIGHT = 0.84                                                # luminosite generale de la pedale
+BRIGHT = 0.80                                                # luminosite generale de la pedale (-20 %)
 bg = np.dstack([np.clip(img * BRIGHT, 0, 255), np.clip(alpha, 0, 1) * 255]).astype(np.uint8)
 Image.fromarray(bg, 'RGBA').save(os.path.join(OUT, 'background.png'), optimize=True)
 
