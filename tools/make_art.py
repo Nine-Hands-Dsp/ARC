@@ -320,7 +320,7 @@ vign = 1.0 - 0.10 * np.clip(vg - 0.55, 0, 1) ** 1.5
 light = (falloff * vign)[..., None]
 img = img * light + (spot * 16.0)[..., None] * (0.35 + 0.65 * plate)[..., None]
 # f) etalonnage photo : lumiere de la boite legerement chaude, ombres legerement froides (lumiere d'ambiance)
-warm = np.array([1.045, 1.0, 0.94]); cool = np.array([0.95, 0.985, 1.06])
+warm = np.array([1.022, 1.008, 0.975]); cool = np.array([0.95, 0.985, 1.06])
 mixw = np.clip(1.25 - 1.3 * u, 0, 1)[..., None]
 img *= warm * mixw + cool * (1 - mixw)
 # g) reflet de la boite a lumiere sur la peinture satinee : bande diagonale large et douce (gradient de lustre)
