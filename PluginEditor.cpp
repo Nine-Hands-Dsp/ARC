@@ -416,18 +416,32 @@ void InfiniteBowEditor::drawMainScreen (Graphics& g)
         g.fillRect (nutX, cy - 0.5f, bridgeX - nutX, 1.0f);
     }
     const float kk = (float) (voice + 1), lvl = shownLevel;
-    for (const auto& pt : parts)
     {
-        const float u = (pt.x - nutX) / (bridgeX - nutX);
-        const float mode = std::sin (MathConstants<float>::pi * u * kk);
-        const float bright = 0.12f + 0.88f * std::pow (std::abs (mode), 1.5f);
-        const float ef = jlimit (0.0f, 1.0f, jmin (u / 0.14f, (1.0f - u) / 0.14f)), edge = ef * ef * (3.0f - 2.0f * ef);
-        const float a = 0.85f * pt.life * bright * edge;
-        if (a < 0.01f) continue;
-        const float y = cy + pt.y + mode * lvl * 15.0f * std::sin ((float) flowTime * 22.0f + pt.ph);
-        const float r = pt.r * (0.6f + 0.6f * pt.life);
-        g.setColour (mainC.withAlpha (jmin (1.0f, a)));
-        g.fillEllipse (pt.x - r, y - r, r * 2.0f, r * 2.0f);
+        // particules contenues dans la vitre de l'ecran, fondu en haut et en bas
+        Graphics::ScopedSaveState clip (g);
+        Path glass; glass.addRoundedRectangle (sr.getX() + 5.0f, sr.getY() + 6.0f, 580.0f, sr.getHeight() - 12.0f, 6.0f);
+        g.reduceClipRegion (glass);
+        const float halfH = sr.getHeight() * 0.5f;
+        for (const auto& pt : parts)
+        {
+            const float u = (pt.x - nutX) / (bridgeX - nutX);
+            const float mode = std::sin (MathConstants<float>::pi * u * kk);
+            const float bright = 0.06f + 0.94f * std::pow (std::abs (mode), 1.8f);
+            const float ef = jlimit (0.0f, 1.0f, jmin (u / 0.14f, (1.0f - u) / 0.14f)), edge = ef * ef * (3.0f - 2.0f * ef);
+            const float y = cy + 1.6f * (pt.y + mode * lvl * 15.0f * std::sin ((float) flowTime * 22.0f + pt.ph));
+            const float vd = jlimit (0.0f, 1.0f, (halfH - 8.0f - std::abs (y - cy)) / 12.0f), vf = vd * vd * (3.0f - 2.0f * vd);
+            const float a = jmin (1.0f, 1.2f * pt.life * bright * edge * vf * (pt.r > 1.7f ? 1.3f : 1.0f));
+            if (a < 0.01f) continue;
+            const float r = pt.r * (0.6f + 0.6f * pt.life);
+            g.setColour (mainC.withAlpha (a));
+            g.fillEllipse (pt.x - r, y - r, r * 2.0f, r * 2.0f);
+            if (pt.r > 1.8f && a > 0.35f)
+            {
+                const float rc = pt.r * 0.35f;
+                g.setColour (Colour (235, 252, 255).withAlpha (a * 0.8f));
+                g.fillEllipse (pt.x - rc, y - rc, rc * 2.0f, rc * 2.0f);
+            }
+        }
     }
     const float posFrac = 0.04f + 0.46f * proc.apvts.getRawParameterValue ("position")->load();
     const float bx = bridgeX - posFrac * (bridgeX - nutX);
@@ -522,7 +536,7 @@ void InfiniteBowEditor::stepFlow (float dt)
     const int n = (int) std::round ((lvl * lvl * 6.0f + (lvl > 0.05f ? 1.0f : 0.0f)) * k);
     for (int i = 0; i < n; ++i)
         parts.push_back ({ bx + (rng.nextFloat() - 0.5f) * 3.0f, (rng.nextBool() ? -1.0f : 1.0f) * sp * (0.5f + rng.nextFloat() * 0.9f),
-                           0.0f, (rng.nextFloat() - 0.5f) * buzz * 3.0f, 1.0f, rng.nextFloat() * 6.28f, 1.0f + rng.nextFloat() * 1.6f });
+                           0.0f, (rng.nextFloat() - 0.5f) * buzz * 3.0f, 1.0f, rng.nextFloat() * 6.28f, 1.0f + rng.nextFloat() * 1.1f });
 
     const float decay = (0.0022f + 0.009f * (1.0f - release)) * (bowOn ? 1.0f : 2.2f) * k;
     for (auto& p : parts)
