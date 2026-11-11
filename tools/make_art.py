@@ -117,6 +117,8 @@ red2 = raster(red_only, W, H, 2.0)[..., 3].astype(np.float32) / 255.0
 metal = cv2.resize(red2, (W, H), interpolation=cv2.INTER_AREA)
 svg_out, _ = rrect_alpha(BODY[0], BODY[1], BODY[2], BODY[3], BODY_SVG_R)
 plate = np.clip(svg_out - np.clip(metal, 0, 1), 0, 1) * body_a          # interieur de la maquette (inchange)
+_d0 = cv2.distanceTransform((body_a > 0.5).astype(np.uint8), cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
+plate *= np.clip((_d0 - 30.0) / 2.0, 0, 1)                               # aucun reste de l'ancien arrondi pres du bord
 metal = np.clip(body_a - plate, 0, 1)                                    # contour jusqu'aux nouveaux coins
 
 # ---- contour : aluminium microbille (texture fournie) + leger bevel
@@ -291,6 +293,29 @@ for side, cy, _ in JACKS:
 
 # ------------------------------------------------------------------ sorties
 os.makedirs(OUT, exist_ok=True)
+# ------------------------------------------------------------------ 9. eclairage d'ambiance (realisme)
+# Une seule source : grande boite a lumiere en haut a gauche, a 45 deg.
+# a) chute de lumiere : la face est plus eclairee pres de la source, plus sombre en bas a droite
+u = ((xx - 0) + (yy - 0)) / (W + H)                                   # 0 en haut a gauche -> 1 en bas a droite
+falloff = 1.16 - 0.36 * u ** 1.15
+# b) reflet large et doux de la boite a lumiere sur la peinture poudre (satinee) et le metal
+spot = np.exp(-(((xx - 0.30 * W) / (0.42 * W)) ** 2 + ((yy - 0.22 * H) / (0.34 * H)) ** 2))
+# c) vignettage tres doux sur les bords (objectif)
+vg = np.hypot((xx - W / 2) / (W / 2), (yy - H / 2) / (H / 2))
+vign = 1.0 - 0.10 * np.clip(vg - 0.55, 0, 1) ** 1.5
+light = (falloff * vign)[..., None]
+img = img * light + (spot * 16.0)[..., None] * (0.35 + 0.65 * plate)[..., None]
+# d) liseres de lumiere : aretes du contour tournees vers la source (haut / gauche), plus vives
+gyo, gxo = np.gradient(cv2.GaussianBlur(dout, (0, 0), 3.0))          # gradient vers l'interieur
+rim_hl = np.exp(-((dout - 2.0) / 1.6) ** 2) * np.clip((gxo + gyo) / np.maximum(np.hypot(gxo, gyo), 1e-3) * 0.7071, 0, 1)
+img += (rim_hl * 55.0 * (1.1 - u))[..., None] * metal[..., None]
+# e) reflet de la boite a lumiere sur les vitres des ecrans (bande diagonale douce, coupee au verre)
+for (x, y, w, h_, r) in (SCREEN_TOP, SCREEN_MAIN):
+    a_in, _ = rrect_alpha(x + 7, y + 7, x + w - 7, y + h_ - 7, max(2, r - 7))
+    band = np.exp(-(((xx - x) + (yy - y) * 1.0 - 0.18 * w) / (0.10 * w)) ** 2) * 18.0 \
+         + np.exp(-(((xx - x) + (yy - y) * 1.0 - 0.30 * w) / (0.02 * w)) ** 2) * 7.0
+    img += (band * a_in * np.clip(1 - (yy - y) / h_ * 0.6, 0, 1))[..., None]
+
 BRIGHT = 0.64                                                # luminosite generale de la pedale (-20 % puis -20 %)
 bg = np.dstack([np.clip(img * BRIGHT, 0, 255), np.clip(alpha, 0, 1) * 255]).astype(np.uint8)
 Image.fromarray(bg, 'RGBA').save(os.path.join(OUT, 'background.png'), optimize=True)
