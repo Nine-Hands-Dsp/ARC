@@ -25,7 +25,8 @@ yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
 rng = np.random.default_rng(3)
 
 # ------------------------------------------------------------------ geometrie (maquette v003, pixels de l'image)
-BODY = (40.0, 0.0, 2310.0, 1800.0, 98.8)                 # x0, y0, x1, y1, rayon des coins
+BODY_SVG_R = 98.8                                          # rayon des coins exterieurs de la maquette
+BODY = (40.0, 0.0, 2310.0, 1800.0, BODY_SVG_R * 0.80)     # x0, y0, x1, y1, rayon des coins (-20 %)
 BEVEL = 64.0
 KNOBS = [(274.36 + 300 * i, 300.0) for i in range(7)]
 KNOB_R = 105.0
@@ -114,8 +115,9 @@ svg = svg.replace('viewBox="0 0 2350 1800">', 'viewBox="0 0 2350 1800" width="23
 red_only = re.sub(r'<g id="Layer_9".*?</svg>', '</svg>', svg, flags=re.S)
 red2 = raster(red_only, W, H, 2.0)[..., 3].astype(np.float32) / 255.0
 metal = cv2.resize(red2, (W, H), interpolation=cv2.INTER_AREA)
-metal = np.clip(metal, 0, 1) * body_a
-plate = np.clip(body_a - metal, 0, 1)
+svg_out, _ = rrect_alpha(BODY[0], BODY[1], BODY[2], BODY[3], BODY_SVG_R)
+plate = np.clip(svg_out - np.clip(metal, 0, 1), 0, 1) * body_a          # interieur de la maquette (inchange)
+metal = np.clip(body_a - plate, 0, 1)                                    # contour jusqu'aux nouveaux coins
 
 # ---- contour : aluminium microbille (texture fournie) + leger bevel
 dout = cv2.distanceTransform((body_a > 0.5).astype(np.uint8), cv2.DIST_L2, cv2.DIST_MASK_PRECISE).astype(np.float32)
