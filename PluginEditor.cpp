@@ -406,38 +406,48 @@ void InfiniteBowEditor::drawMainScreen (Graphics& g)
 {
     const auto& sr = screenMain;
     const float cy = sr.getCentreY(), nutX = sr.getX() + 23.0f, bridgeX = sr.getX() + 565.0f;
-    g.setColour (Colour (0xffe6e7e9));
-    g.fillRoundedRectangle (nutX - 3.5f, cy - 22.0f, 7.0f, 44.0f, 3.0f);
-    g.fillRoundedRectangle (bridgeX - 3.5f, cy - 22.0f, 7.0f, 44.0f, 3.0f);
-
-    // corde en onde stationnaire (1, 2 ou 3 ventres selon VOICE)
-    const float x0 = nutX + 3.5f, x1 = bridgeX - 3.5f, kk = (float) (voice + 1), amp = shownLevel * 13.0f;
-    Path p;
-    for (int i = 0; i <= 160; ++i)
+    // flux d'archet : corde en fondu aux deux bouts, particules qui partent du point de contact de l'archet
+    const Colour mainC = layerB ? orange : cyan, accC = layerB ? cyan : orange;
     {
-        const float u = (float) i / 160.0f;
-        const float shape = std::sin (MathConstants<float>::pi * kk * u);
-        const float ripple = 0.18f * std::sin (MathConstants<float>::pi * (2.0f * kk + 1.0f) * u) * (float) std::sin (phase * 2.3);
-        const float y = cy + amp * (shape * (float) std::sin (phase) + ripple);
-        const float x = x0 + u * (x1 - x0);
-        if (i == 0) p.startNewSubPath (x, y); else p.lineTo (x, y);
+        ColourGradient lg (Colour (0x00c8d2dc), nutX, cy, Colour (0x00c8d2dc), bridgeX, cy, false);
+        lg.addColour (0.14, Colour (0x33c8d2dc));
+        lg.addColour (0.86, Colour (0x33c8d2dc));
+        g.setGradientFill (lg);
+        g.fillRect (nutX, cy - 0.5f, bridgeX - nutX, 1.0f);
     }
-    g.setColour (cyan.withAlpha ((0.10f + 0.25f * shownLevel) * jmax (0.25f, glow)));
-    g.strokePath (p, PathStrokeType (8.0f));
-    g.setColour (cyan);
-    g.strokePath (p, PathStrokeType (2.5f));
-
-    // archet place selon POSITION (depuis le chevalet)
+    const float kk = (float) (voice + 1), lvl = shownLevel;
+    for (const auto& pt : parts)
+    {
+        const float u = (pt.x - nutX) / (bridgeX - nutX);
+        const float mode = std::sin (MathConstants<float>::pi * u * kk);
+        const float bright = 0.12f + 0.88f * std::pow (std::abs (mode), 1.5f);
+        const float ef = jlimit (0.0f, 1.0f, jmin (u / 0.14f, (1.0f - u) / 0.14f)), edge = ef * ef * (3.0f - 2.0f * ef);
+        const float a = 0.85f * pt.life * bright * edge;
+        if (a < 0.01f) continue;
+        const float y = cy + pt.y + mode * lvl * 15.0f * std::sin ((float) flowTime * 22.0f + pt.ph);
+        const float r = pt.r * (0.6f + 0.6f * pt.life);
+        g.setColour (mainC.withAlpha (jmin (1.0f, a)));
+        g.fillEllipse (pt.x - r, y - r, r * 2.0f, r * 2.0f);
+    }
     const float posFrac = 0.04f + 0.46f * proc.apvts.getRawParameterValue ("position")->load();
-    const float bx = x1 - posFrac * (x1 - x0);
-    const auto box = Rectangle<float> (48.0f, 62.0f).withCentre ({ bx, cy });
+    const float bx = bridgeX - posFrac * (bridgeX - nutX);
+    const bool bowOn = proc.apvts.getRawParameterValue ("bow")->load() > 0.5f;
+    if (lvl > 0.02f && glow > 0.0f)
+    {
+        ColourGradient hg (accC.withAlpha (0.35f * lvl * glow), bx, cy, accC.withAlpha (0.0f), bx + 40.0f, cy, true);
+        g.setGradientFill (hg);
+        g.fillEllipse (bx - 40.0f, cy - 40.0f, 80.0f, 80.0f);
+    }
+    if (bowOn && glow > 0.0f)
+    {
+        ColourGradient dg (accC.withAlpha (0.5f * glow), bx, cy, accC.withAlpha (0.0f), bx + 12.0f, cy, true);
+        g.setGradientFill (dg);
+        g.fillEllipse (bx - 12.0f, cy - 12.0f, 24.0f, 24.0f);
+    }
+    const float dr = bowOn ? 4.5f : 3.0f;
+    g.setColour (accC.withAlpha (bowOn ? 1.0f : 0.45f));
+    g.fillEllipse (bx - dr, cy - dr, dr * 2.0f, dr * 2.0f);
     const bool bowing = proc.uiState.load() == 2;
-    g.setColour (Colour (0xff0b0c10).withAlpha (0.92f));
-    g.fillRoundedRectangle (box, 6.0f);
-    g.setColour (bowing ? noteOrg : noteOrg.withAlpha (0.45f));
-    g.drawRoundedRectangle (box, 6.0f, bowing ? 2.5f : 1.6f);
-    g.setFont (Font (FontOptions (poppinsMed).withHeight (13.0f)));
-    g.drawText ("BOW", box, Justification::centred, false);
 
     // separateur + note detectee
     const float sx = sr.getX() + 590.0f;
@@ -491,6 +501,43 @@ void InfiniteBowEditor::drawFootRings (Graphics& g)
             g.fillEllipse (c.x - r, c.y - r, r * 2.0f, r * 2.0f);
         }
     }
+}
+
+// une image du timer (1/30 s) = deux images de l'apercu valide (60 i/s) : vitesses et usure doublees
+void InfiniteBowEditor::stepFlow (float dt)
+{
+    const auto& sr = screenMain;
+    const float x0 = sr.getX() + 23.0f, x1 = sr.getX() + 565.0f;
+    const float k = dt * 60.0f;
+    auto norm = [this] (const char* id) { auto* p = proc.apvts.getParameter (id); return p != nullptr ? p->getValue() : 0.0f; };
+    const float attack = norm ("attack"), release = norm ("release"), buzz = norm ("buzz");
+    const float posFrac = 0.04f + 0.46f * proc.apvts.getRawParameterValue ("position")->load();
+    const float bx = x1 - posFrac * (x1 - x0);
+    const bool bowOn = proc.apvts.getRawParameterValue ("bow")->load() > 0.5f;
+    const float lvl = shownLevel;
+    flowTime += dt;
+
+    // emission au point de contact
+    const float sp = 2.2f + 4.5f * (1.0f - attack);
+    const int n = (int) std::round ((lvl * lvl * 6.0f + (lvl > 0.05f ? 1.0f : 0.0f)) * k);
+    for (int i = 0; i < n; ++i)
+        parts.push_back ({ bx + (rng.nextFloat() - 0.5f) * 3.0f, (rng.nextBool() ? -1.0f : 1.0f) * sp * (0.5f + rng.nextFloat() * 0.9f),
+                           0.0f, (rng.nextFloat() - 0.5f) * buzz * 3.0f, 1.0f, rng.nextFloat() * 6.28f, 1.0f + rng.nextFloat() * 1.6f });
+
+    const float decay = (0.0022f + 0.009f * (1.0f - release)) * (bowOn ? 1.0f : 2.2f) * k;
+    for (auto& p : parts)
+    {
+        p.x += p.v * k;
+        if (p.x < x0) { p.x = 2.0f * x0 - p.x; p.v *= -0.85f; }
+        if (p.x > x1) { p.x = 2.0f * x1 - p.x; p.v *= -0.85f; }
+        p.life -= decay;
+        p.vy += (rng.nextFloat() - 0.5f) * buzz * 1.2f * k;
+        p.vy *= std::pow (0.88f, k);
+        p.y = (p.y + p.vy * k) * std::pow (0.97f, k);
+    }
+    parts.erase (std::remove_if (parts.begin(), parts.end(), [] (const Particle& p) { return p.life <= 0.0f; }), parts.end());
+    constexpr size_t maxParts = 700;
+    if (parts.size() > maxParts) parts.erase (parts.begin(), parts.begin() + (long) (parts.size() - maxParts));
 }
 
 juce::String InfiniteBowEditor::noteName (float hz)
@@ -610,11 +657,12 @@ void InfiniteBowEditor::timerCallback()
     // ecran de corde : anime tant que la corde vibre, sinon seulement si un element change
     shownLevel += (proc.uiLevel.load() - shownLevel) * 0.25f;
     phase += 0.9; if (phase > 1000.0) phase -= 1000.0;
+    stepFlow (1.0f / 30.0f);
     const float hz = proc.uiPitchHz.load();
     const String key = String (voice) + "|" + String (proc.uiState.load()) + "|" + (hz > 0.0f ? noteName (hz) + String (hz, 1) : String ("-"))
                      + "|" + String ((int) bowOn) + String (proc.uiFeedback.load() > 0.25f ? proc.uiFbHarm.load() : 0);
     const float pos = proc.apvts.getRawParameterValue ("position")->load();
-    if (shownLevel > 0.002f || std::abs (dLevel - shownLevel) > 0.002f || std::abs (dPos - pos) > 0.002f || key != drawnDisplayKey)
+    if (shownLevel > 0.002f || ! parts.empty() || std::abs (dLevel - shownLevel) > 0.002f || std::abs (dPos - pos) > 0.002f || key != drawnDisplayKey)
     {
         dLevel = shownLevel; dPos = pos; drawnDisplayKey = key;
         askRepaint (screenMain);

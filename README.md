@@ -4,6 +4,7 @@ Plugin VST3 (Windows / macOS) et AU (macOS) qui simule un archet électronique :
 sustain infini, attaque en « swell » sans médiator, modes harmoniques, position de l'archet sur la corde.
 Dans le DAW, il apparaît sous le nom **Arc**, fabricant **NINE HANDS | DSP**.
 
+v3.1.0 : écran de corde « flux d'archet » (particules de lumière).
 v3.0.0 : pédale entièrement refaite (nouveau boîtier format double, pièces photo, écrans, Glow réglable au clic droit)
 
 <p align="center">
@@ -67,7 +68,7 @@ La note tenue s'épanouit au bout d'environ une seconde vers une harmonique qui 
 ### Écrans
 
 - **Écran du haut** : au repos, la barre de presets (◀ numéro et nom du preset ▶, clic sur le nom pour la liste). Dès qu'un réglage bouge, la ligne d'état prend sa place (réglage et valeur, en orange ou en bleu selon le mode), puis la barre de presets revient en fondu après 2,5 s.
-- **Écran de corde** : la corde vibre avec 1, 2 ou 3 ventres selon VOICE. Le bloc BOW se place selon POSITION. L'écran affiche aussi la note détectée, sa fréquence et l'état (IDLE, LISTENING, BOWING, RELEASE).
+- **Écran de corde (flux d'archet)** : des particules de lumière partent du point de contact de l'archet (placé selon POSITION) et voyagent vers les deux bouts de la corde ; densité = niveau, vitesse = ATTACK, durée = RELEASE, tremblement = BUZZ, ventres de vibration selon VOICE. L'écran affiche aussi la note détectée, sa fréquence et l'état (IDLE, LISTENING, BOWING, RELEASE).
 
 ### Glow
 

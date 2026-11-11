@@ -112,6 +112,12 @@ private:
     float ledLvl[13] {};                   // 0 mode, 1-3 voice, 4-11 presets, 12 inutilise
     float bowLvl = 0.0f, holdLvl = 0.0f, shownLevel = 0.0f;
     double phase = 0.0;
+    // ecran de corde « flux d'archet » : particules simulees par le timer, dessinees par paint
+    struct Particle { float x, v, y, vy, life, ph, r; };
+    std::vector<Particle> parts;
+    juce::Random rng;
+    double flowTime = 0.0;
+    void stepFlow (float dt);
     bool footDown[2] { false, false };
     Hit hover;
 
