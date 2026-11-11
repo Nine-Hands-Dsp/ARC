@@ -122,9 +122,8 @@ plate *= np.clip((_d0 - 30.0) / 2.0, 0, 1)                               # aucun
 metal = np.clip(body_a - plate, 0, 1)                                    # contour jusqu'aux nouveaux coins
 
 # ---- contour : aluminium microbille (texture fournie) + leger bevel
-dout = cv2.distanceTransform((body_a > 0.5).astype(np.uint8), cv2.DIST_L2, cv2.DIST_MASK_PRECISE).astype(np.float32)
-dout = dout + (body_a - 0.5)                                   # sous-pixel au bord exterieur
-din = cv2.distanceTransform((metal > 0.5).astype(np.uint8), cv2.DIST_L2, cv2.DIST_MASK_PRECISE).astype(np.float32)
+dout = np.maximum(-body_d, 0).astype(np.float32)                # distance exacte au bord exterieur (rectangle arrondi analytique)
+din = cv2.GaussianBlur(cv2.distanceTransform((metal > 0.5).astype(np.uint8), cv2.DIST_L2, cv2.DIST_MASK_PRECISE).astype(np.float32), (0, 0), 1.2)
 # leger bevel : arrondi de 20 px sur l'arete exterieure + petit chanfrein de 5 px contre la plaque
 h_out = np.sqrt(np.clip(1 - (1 - np.clip(dout / 20.0, 0, 1)) ** 2, 0, 1)) * 9.0
 h_in = np.clip(din / 5.0, 0, 1) * 2.0
