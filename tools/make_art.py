@@ -142,7 +142,7 @@ def refl(i):
     i = i % (2 * TS)
     return np.where(i < TS, i, 2 * TS - 1 - i)
 alu = tex[refl(yy.astype(np.int32)), refl(xx.astype(np.int32))]
-alu = alu * (np.array([0.985, 0.99, 1.02]) * (196.0 / 171.0) * 0.86 * 0.90)        # teinte du contour d'origine
+alu = alu * (np.array([0.985, 0.99, 1.02]) * (196.0 / 171.0) * 0.86 * 0.72)        # teinte du contour d'origine
 flat = LB[2]
 shade = 0.30 + 0.70 * ndl / flat
 metal_rgb = alu * shade[..., None] + (spec * 70)[..., None]
@@ -291,7 +291,7 @@ for side, cy, _ in JACKS:
 
 # ------------------------------------------------------------------ sorties
 os.makedirs(OUT, exist_ok=True)
-BRIGHT = 0.80                                                # luminosite generale de la pedale (-20 %)
+BRIGHT = 0.64                                                # luminosite generale de la pedale (-20 % puis -20 %)
 bg = np.dstack([np.clip(img * BRIGHT, 0, 255), np.clip(alpha, 0, 1) * 255]).astype(np.uint8)
 Image.fromarray(bg, 'RGBA').save(os.path.join(OUT, 'background.png'), optimize=True)
 
