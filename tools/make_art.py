@@ -117,36 +117,51 @@ metal = cv2.resize(red2, (W, H), interpolation=cv2.INTER_AREA)
 metal = np.clip(metal, 0, 1) * body_a
 plate = np.clip(body_a - metal, 0, 1)
 
-# hauteur du bevel : quart de rond sur 64 px depuis l'exterieur
+# ---- contour : aluminium brosse (texture fournie, assets/kit/brushed_alu_4096.png, reduite de moitie) + leger bevel
 dout = cv2.distanceTransform((body_a > 0.5).astype(np.uint8), cv2.DIST_L2, cv2.DIST_MASK_PRECISE).astype(np.float32)
 dout = dout + (body_a - 0.5)                                   # sous-pixel au bord exterieur
-t = np.clip(dout / BEVEL, 0, 1)
-hgt = np.sqrt(np.clip(1 - (1 - t) ** 2, 0, 1)) * BEVEL        # vrai quart de rond : 64 px de large, 64 px de haut
-hgt = cv2.GaussianBlur(hgt, (0, 0), 0.8)
+din = cv2.distanceTransform((metal > 0.5).astype(np.uint8), cv2.DIST_L2, cv2.DIST_MASK_PRECISE).astype(np.float32)
+# leger bevel : arrondi de 20 px sur l'arete exterieure + petit chanfrein de 5 px contre la plaque
+h_out = np.sqrt(np.clip(1 - (1 - np.clip(dout / 20.0, 0, 1)) ** 2, 0, 1)) * 9.0
+h_in = np.clip(din / 5.0, 0, 1) * 2.0
+hgt = cv2.GaussianBlur(np.minimum(h_out, 7.0 + h_in), (0, 0), 0.8)
 gy, gx = np.gradient(hgt)
 nrm = np.dstack([-gx, -gy, np.ones_like(gx)]); nrm /= np.linalg.norm(nrm, axis=2, keepdims=True)
 LB = np.array([-1.0, -1.0, 1.15]); LB /= np.linalg.norm(LB)
 ndl = np.clip((nrm * LB).sum(2), 0, 1)
 half = LB + np.array([0, 0, 1.0]); half /= np.linalg.norm(half)
-spec = np.clip((nrm * half).sum(2), 0, 1) ** 14
-# aluminium satine, stries fines paralleles au contour
-lines = rng.normal(0, 1, 8192).astype(np.float32)
-lines = cv2.GaussianBlur(lines.reshape(1, -1), (0, 0), 1.0).ravel()
-stri = np.interp(dout * 3.1, np.arange(8192), lines).astype(np.float32)
+spec = np.clip((nrm * half).sum(2), 0, 1) ** 30
 grain = cv2.GaussianBlur(rng.normal(0, 1, (H, W)).astype(np.float32), (0, 0), 0.6)
-sky = np.clip(0.5 - 0.5 * (nrm[..., 0] + nrm[..., 1]) * 0.7071, 0, 1)   # reflet de l'environnement (cote lumiere plus clair)
-mlum = np.minimum(38 + 150 * ndl ** 1.15 + 36 * sky + 45 * spec + 5.5 * stri + 2.5 * grain, 232)
-metal_rgb = np.dstack([mlum * 0.985, mlum * 0.99, mlum * 1.02])
-metal_rgb *= (0.80 + 0.20 * np.clip(dout / 5.0, 0, 1))[..., None]
+tex = np.asarray(Image.open(os.path.join(KIT, 'brushed_alu_4096.png')).convert('RGB')).astype(np.float32)
+tex = cv2.resize(tex, (2048, 2048), interpolation=cv2.INTER_AREA)          # reduction seulement (jamais d'agrandissement)
+TS = tex.shape[0]
+ix, iy = (xx.astype(np.int32) % TS), (yy.astype(np.int32) % TS)
+tex_h = tex[iy, ix]                                                          # stries horizontales (haut / bas)
+tex_v = tex[ix, iy]                                                          # meme texture tournee d'un quart de tour (cotes)
+gyo, gxo = np.gradient(cv2.GaussianBlur(dout, (0, 0), 6.0))
+wh = gyo ** 2 / np.maximum(gxo ** 2 + gyo ** 2, 1e-6)
+wh = cv2.GaussianBlur(wh.astype(np.float32), (0, 0), 10.0)[..., None]
+alu = tex_h * wh + tex_v * (1 - wh)
+alu = alu * (np.array([0.985, 0.99, 1.02]) * (196.0 / 157.0) * 0.86)        # teinte du contour d'origine
+flat = LB[2]
+shade = 0.30 + 0.70 * ndl / flat
+metal_rgb = alu * shade[..., None] + (spec * 70)[..., None]
+metal_rgb *= (0.78 + 0.22 * np.clip(dout / 3.0, 0, 1))[..., None]          # arete exterieure
 
-# plaque grise lisse (style d'origine) : peinture mate, degrade lumineux haut-gauche, grain fin
+# ---- plaque : acier peint en poudre (epoxy), meme teinte grise : peau d'orange fine + grains
 top = np.array([88.0, 92.0, 97.0]); bot = np.array([66.0, 69.0, 74.0])
 diag = np.clip(((xx - 40) / 2270 * 0.35 + yy / 1800 * 0.65), 0, 1)[..., None]
 plate_rgb = top * (1 - diag) + bot * diag
 vig = np.hypot((xx - W * 0.45) / W, (yy - H * 0.35) / H)
 plate_rgb *= (1.05 - 0.20 * np.clip(vig, 0, 1))[..., None]
-pg = cv2.GaussianBlur(rng.normal(0, 1, (H, W)).astype(np.float32), (0, 0), 0.7) * 2.0
-plate_rgb += pg[..., None]
+n0 = rng.normal(0, 1, (H, W)).astype(np.float32)
+peel = cv2.GaussianBlur(n0, (0, 0), 1.9) * 1.0 + cv2.GaussianBlur(rng.normal(0, 1, (H, W)).astype(np.float32), (0, 0), 4.5) * 1.3
+pgy, pgx = np.gradient(peel)
+plate_rgb *= (1.0 + 1.6 * (pgx + pgy) / np.sqrt(2.0))[..., None]            # relief eclaire en haut a gauche
+speck = (rng.random((H, W)) < 0.035).astype(np.float32) * rng.normal(0, 1, (H, W)).astype(np.float32)
+speck = cv2.GaussianBlur(speck, (0, 0), 0.5) * 11.0
+plate_rgb += (speck + cv2.GaussianBlur(rng.normal(0, 1, (H, W)).astype(np.float32), (0, 0), 0.6) * 1.6)[..., None]
+plate_rgb *= (1.0 + 0.035 * np.clip(cv2.GaussianBlur(n0, (0, 0), 40.0) * 6, -1, 1))[..., None]   # legere irregularite du lustre
 # occlusion contre le metal (la plaque est un peu en retrait du bevel)
 dmet = cv2.distanceTransform((metal < 0.5).astype(np.uint8), cv2.DIST_L2, cv2.DIST_MASK_PRECISE).astype(np.float32)
 occ = 0.40 * np.exp(-dmet / 5.0) + 0.12 * np.exp(-dmet / 22.0)
@@ -222,28 +237,14 @@ for (cx, cy) in FOOTS:
     put_sprite(img, None, rgb, a, cx, cy, FS_FLATS, 0.62, 0.6)
 
 # ------------------------------------------------------------------ 6. vis (rendu procedural : tete bombee, empreinte six pans, inox)
+SCREW_C, SCREW_RPX = (137.0, 135.0), 89.0                 # photo de vis fournie (tete cruciforme), 275 x 271
 def screw_sprite(R):
-    n = int(np.ceil(R * 2 + 4)); c = n / 2
-    sy, sx = np.mgrid[0:n, 0:n].astype(np.float32) + 0.5
-    rr = np.hypot(sx - c, sy - c) / R
-    a = np.clip((1 - rr) * R + 0.5, 0, 1)
-    hh = np.sqrt(np.clip(1 - rr ** 2, 0, 1)) * 0.55 + 0.06
-    # empreinte six pans
-    ang = np.arctan2(sy - c, sx - c)
-    hexr = 0.34 * np.cos(np.pi / 6) / np.cos(((ang + np.pi / 6) % (np.pi / 3)) - np.pi / 6)
-    sock = rr < hexr
-    hh = np.where(sock, hh - 0.30, hh)
-    hpx = cv2.GaussianBlur(hh.astype(np.float32), (0, 0), 0.6) * R
-    gy, gx = np.gradient(hpx)
-    nn = np.dstack([-gx, -gy, np.ones_like(gx)]); nn /= np.linalg.norm(nn, axis=2, keepdims=True)
-    d = np.clip((nn * LIGHT).sum(2), 0, 1); s = np.clip((nn * half).sum(2), 0, 1) ** 30
-    envr = 0.5 - 0.5 * nn[..., 1]
-    lum = 55 + 110 * d + 45 * envr + 140 * s
-    lum = np.where(sock, lum * 0.35, lum)
-    # stries de tournage concentriques fines
-    lum += np.sin(rr * R * 2.4) * 3.5
-    rgb = np.dstack([lum, lum * 1.0, lum * 1.03])
-    return np.clip(rgb, 0, 255), a
+    im = np.asarray(Image.open(os.path.join(KIT, 'screw_photo.png')).convert('RGB')).astype(np.float32)
+    h, w = im.shape[:2]
+    sy, sx = np.mgrid[0:h, 0:w].astype(np.float32)
+    a = np.clip(SCREW_RPX - np.hypot(sx - SCREW_C[0], sy - SCREW_C[1]) + 0.5, 0, 1)
+    n = int(np.ceil(R * 2 + 4))
+    return place(np.dstack([im, a * 255]).astype(np.float32), SCREW_C, R / SCREW_RPX, n)
 for (cx, cy) in SCREWS:
     rgb, a = screw_sprite(SCREW_R)
     put_sprite(img, None, rgb, a, cx, cy, 2 * SCREW_R, 0.55, 0.65)

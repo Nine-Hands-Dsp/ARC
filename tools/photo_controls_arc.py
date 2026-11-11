@@ -85,16 +85,14 @@ def led_variants(r_px, pad=1.5, scale=1):
     rgb = im[..., :3]; a = im[..., 3] / 255.0
     lum = rgb.max(2) / 255.0                                  # intensite (la LED rouge sature R)
     white = np.clip((rgb[..., 1] - 40) / 200.0, 0, 1)         # zones blanchies (reflet / coeur)
-    lumR = rgb[..., 0] / 255.0
-    det = lumR - cv2.GaussianBlur(lumR, (0, 0), 6)            # structure interne de la LED, adoucie
-    h_, w_ = lumR.shape
-    yy0, xx0 = np.mgrid[0:h_, 0:w_].astype(np.float32)
-    rr0 = np.hypot(xx0 - LED_C[0], yy0 - LED_C[1]) / LED_RPX
-    core = np.exp(-(rr0 / 0.42) ** 2)                          # coeur presque blanc
+    hsv = cv2.cvtColor(np.clip(rgb, 0, 255).astype(np.uint8), cv2.COLOR_RGB2HSV).astype(np.float32)
     def tint(col):
-        body = col[None, None, :] * np.clip(0.80 + 0.35 * det - 0.25 * rr0 ** 3, 0.35, 1.05)[..., None]
-        out = body * (1 - 0.55 * core[..., None]) + 255 * 0.55 * core[..., None] * (0.6 + 0.4 * col[None, None, :] / 255)
-        return np.clip(out + (white * 40)[..., None], 0, 255)
+        # meme photo, seule la teinte change (structure interne et reflets gardes)
+        hue = cv2.cvtColor(np.uint8([[col]]), cv2.COLOR_RGB2HSV)[0, 0, 0].astype(np.float32)
+        h2 = hsv.copy()
+        h2[..., 0] = (hsv[..., 0] + (hue - 0.0)) % 180
+        out = cv2.cvtColor(np.clip(h2, 0, 255).astype(np.uint8), cv2.COLOR_HSV2RGB).astype(np.float32)
+        return out
     # eteinte : lentille fumee sombre, le reflet en haut a gauche reste visible
     g = rgb.mean(2)
     off = np.dstack([g, g, g]) * 0.10 + 14
