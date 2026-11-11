@@ -155,11 +155,11 @@ plate_rgb = top * (1 - diag) + bot * diag
 vig = np.hypot((xx - W * 0.45) / W, (yy - H * 0.35) / H)
 plate_rgb *= (1.05 - 0.20 * np.clip(vig, 0, 1))[..., None]
 n0 = rng.normal(0, 1, (H, W)).astype(np.float32)
-peel = cv2.GaussianBlur(n0, (0, 0), 1.9) * 1.0 + cv2.GaussianBlur(rng.normal(0, 1, (H, W)).astype(np.float32), (0, 0), 4.5) * 1.3
+peel = cv2.GaussianBlur(n0, (0, 0), 1.0) * 0.9 + cv2.GaussianBlur(rng.normal(0, 1, (H, W)).astype(np.float32), (0, 0), 2.4) * 1.1
 pgy, pgx = np.gradient(peel)
-plate_rgb *= (1.0 + 1.6 * (pgx + pgy) / np.sqrt(2.0))[..., None]            # relief eclaire en haut a gauche
-speck = (rng.random((H, W)) < 0.035).astype(np.float32) * rng.normal(0, 1, (H, W)).astype(np.float32)
-speck = cv2.GaussianBlur(speck, (0, 0), 0.5) * 11.0
+plate_rgb *= (1.0 + 0.8 * (pgx + pgy) / np.sqrt(2.0))[..., None]            # relief eclaire en haut a gauche
+speck = (rng.random((H, W)) < 0.05).astype(np.float32) * rng.normal(0, 1, (H, W)).astype(np.float32)
+speck = cv2.GaussianBlur(speck, (0, 0), 0.4) * 8.0
 plate_rgb += (speck + cv2.GaussianBlur(rng.normal(0, 1, (H, W)).astype(np.float32), (0, 0), 0.6) * 1.6)[..., None]
 plate_rgb *= (1.0 + 0.035 * np.clip(cv2.GaussianBlur(n0, (0, 0), 40.0) * 6, -1, 1))[..., None]   # legere irregularite du lustre
 # occlusion contre le metal (la plaque est un peu en retrait du bevel)
