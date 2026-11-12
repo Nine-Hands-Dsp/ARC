@@ -86,15 +86,8 @@ InfiniteBowEditor::InfiniteBowEditor (InfiniteBowProcessor& p)
     minSize.setMinimumSize (minW, minH);
     minSize.setMaximumSize (maxW, maxH);
 
-    const float saved = proc.uiScale.load();
-    if (saved > 0.0f) applyScale (saved);
-    else
-    {
-        const int def = WigaWindowSize::defaultIndex (JucePlugin_Name, numSizes);
-        applyScale ((float) sizeHeight (def) / (float) refH);
-        openScale = (float) sizeHeight (def) / (float) refH;
-        proc.uiScale.store (-1.0f);
-    }
+    // taille choisie au menu pour ce projet, sinon celle de « Default size (new windows) »
+    applyScale ((float) sizeHeight (NineHandsWindow::openIndex (JucePlugin_Name, proc.uiSizeIdx.load(), numSizes)) / (float) refH);
     rebuildCache();
     startTimerHz (30);
 }
@@ -135,9 +128,7 @@ void InfiniteBowEditor::applyScale (float s)
 void InfiniteBowEditor::resized()
 {
     resizeSettle = 4;                                     // anti-gel v2 : le cache du fond est refait par le timer
-    const float s = (float) getHeight() / (float) refH;
-    if (getHeight() >= minH - 2 && ! (proc.uiScale.load() < 0.0f && std::abs (s - openScale) < 0.005f))
-        proc.uiScale.store (jlimit ((float) minH / (float) refH, (float) maxH / (float) refH, s));
+    // seules les tailles choisies au menu sont enregistrees (pas celles tirees au coin)
 }
 
 //==============================================================================
@@ -359,6 +350,7 @@ void InfiniteBowEditor::drawPrint (Graphics& g)
 
 juce::String InfiniteBowEditor::presetText() const
 {
+    if (preset > 100) return "USER " + String (preset - 100);
     return String (preset + 1) + "   " + String (InfiniteBowProcessor::factoryPresets[jlimit (0, InfiniteBowProcessor::numFactoryPresets - 1, preset)].name).toUpperCase();
 }
 
@@ -831,80 +823,86 @@ void InfiniteBowEditor::handleMidiMenu (int r)
     else if (r == 1211) proc.midiFsToggle.store (true);
 }
 
-void InfiniteBowEditor::showContextMenu (Point<float> u)
+PopupMenu InfiniteBowEditor::buildContextMenu (int learnIdx)
 {
     using namespace NineHandsMenu;
-    const int learnIdx = learnIndexFor (hitAt (u));
     const Colour accent = layerB ? cyan : orange;
     auto ccText = [this] (int i) { const int cc = proc.ccMap[i].load(); return cc >= 0 ? "CC " + String (cc) : String ("not assigned"); };
     const int lt = proc.learnTarget.load();
-
     PopupMenu m;
     m.setLookAndFeel (&menuLnf);
     if (learnIdx >= 0)
     {
+        // menu d'une commande (tronc commun) : en-tete, MIDI Learn, Clear MIDI, Cancel MIDI learn
         const String name = InfiniteBowProcessor::learnDef (learnIdx).name;
         const int type = InfiniteBowProcessor::learnDef (learnIdx).type;
         addHeader (m, menuLnf.f, type == InfiniteBowProcessor::learnContinuous ? icoKnob : type == InfiniteBowProcessor::learnFootswitch ? icoPedal : icoSwitch,
                    accent, name, "MIDI: " + ccText (learnIdx));
         m.addItem (1000 + learnIdx, "MIDI Learn: " + name, true, lt == learnIdx);
         m.addItem (1100 + learnIdx, "Clear MIDI: " + name, proc.ccMap[learnIdx].load() >= 0);
-        if (lt >= 0) m.addItem (1200, "Cancel MIDI learn");
-        m.addSeparator();
+        m.addItem (1200, "Cancel MIDI learn", lt >= 0);
+        return m;
     }
-    else
-        addHeader (m, menuLnf.f, icoPedal, accent, "Arc", "Electronic bow  v" + String (JucePlugin_VersionString));
 
-    PopupMenu sizes, defSizes;
+    addHeader (m, menuLnf.f, icoPedal, accent, "Arc", "Electronic bow  v" + String (JucePlugin_VersionString));
+    PopupMenu factory, load, save;
+    for (int i = 0; i < InfiniteBowProcessor::numFactoryPresets; ++i)
+        factory.addItem (100 + i, String (i + 1) + ". " + InfiniteBowProcessor::factoryPresets[i].name, true, i == proc.currentPreset.load());
+    for (int slot = 1; slot <= 9; ++slot)
     {
-        const char* labels[numSizes] = { "60 %", "75 %", "100 %" };
-        const int def = WigaWindowSize::defaultIndex (JucePlugin_Name, numSizes);
-        for (int i = 0; i < numSizes; ++i)
-        {
-            sizes.addItem (1 + i, String (labels[i]) + (i == def ? "  (default)" : ""), true, std::abs (getHeight() - sizeHeight (i)) <= 2);
-            defSizes.addItem (20 + i, labels[i], true, i == def);
-        }
-        sizes.addSeparator();
-        sizes.addSubMenu ("Default size (new windows)", defSizes);
+        const bool exists = proc.hasUserPreset (slot);
+        load.addItem (200 + slot, "User " + String (slot) + (exists ? "" : "  (empty)"), exists, proc.currentPreset.load() == 100 + slot);
+        save.addItem (300 + slot, "User " + String (slot) + (exists ? "  (overwrite)" : ""));
     }
-    m.addSubMenu ("Plugin size", sizes);
-    PopupMenu glowM;
-    {
-        const int now = roundToInt (glow * 100.0f);
-        for (int i = 0; i < NineHandsGlow::numSteps; ++i)
-            glowM.addItem (40 + i, String (NineHandsGlow::steps[i]) + " %", true, now == NineHandsGlow::steps[i]);
-    }
-    m.addSubMenu ("Glow", glowM);
+    m.addSubMenu ("Factory presets", factory);
+    m.addSubMenu ("Load user preset", load);
+    m.addSubMenu ("Save user preset", save);
     m.addSeparator();
 
     PopupMenu midi;
+    midi.addSectionHeader ("MIDI Learn");
     for (int i = 0; i < InfiniteBowProcessor::numLearn; ++i)
         midi.addItem (1000 + i, "Learn: " + String (InfiniteBowProcessor::learnDef (i).name) + "  (" + ccText (i) + ")", true, lt == i);
     midi.addSeparator();
-    if (lt >= 0) midi.addItem (1200, "Cancel MIDI learn");
+    midi.addItem (1200, "Cancel MIDI learn", lt >= 0);
     midi.addItem (1201, "Clear all MIDI assignments");
     midi.addSeparator();
-    midi.addItem (1210, "MIDI footswitches latching (127 = on / 0 = off)", true, ! proc.midiFsToggle.load());
-    midi.addItem (1211, "MIDI footswitches momentary (toggle each press)", true, proc.midiFsToggle.load());
+    NineHandsWindow::addMidiFootswitchMode (midi, ! proc.midiFsToggle.load());
+    midi.addSeparator();
+    NineHandsWindow::addProgramChangeInfo (midi);
     m.addSubMenu ("MIDI", midi);
+    m.addSeparator();
 
+    const char* labels[numSizes] = { "60 %", "75 %", "100 %" };
+    const int heights[numSizes] = { sizeHeight (0), sizeHeight (1), sizeHeight (2) };
+    m.addSubMenu ("Plugin size", NineHandsWindow::sizeMenu (JucePlugin_Name, numSizes, labels, heights, getHeight()));
+    m.addSubMenu ("Glow intensity", NineHandsWindow::glowMenu (roundToInt (glow * 100.0f)));
+    return m;
+}
+
+void InfiniteBowEditor::showContextMenu (Point<float> u)
+{
+    auto m = buildContextMenu (learnIndexFor (hitAt (u)));
     m.showMenuAsync (PopupMenu::Options().withMousePosition(),
         [safe = Component::SafePointer<InfiniteBowEditor> (this)] (int r)
         {
             if (safe == nullptr || r <= 0 || r == 9001) return;
-            if (r <= numSizes) safe->applyScale ((float) sizeHeight (r - 1) / (float) safe->refH);
-            else if (r >= 20 && r < 20 + numSizes)
+            auto& ed = *safe;
+            int inst = ed.proc.uiSizeIdx.load();
+            const int sz = NineHandsWindow::handleSize (r, JucePlugin_Name, numSizes, inst);
+            if (sz >= 0) { ed.proc.uiSizeIdx = inst; ed.applyScale ((float) sizeHeight (sz) / (float) ed.refH); return; }
+            if (const int pc = NineHandsWindow::handleGlow (r, JucePlugin_Name)) { ed.glow = (float) pc / 100.0f; ed.repaint(); ed.flash ("Glow  " + String (pc) + " %", 1.5); return; }
+            if      (r == NineHandsWindow::idLatch)     ed.proc.midiFsToggle.store (false);
+            else if (r == NineHandsWindow::idMomentary) ed.proc.midiFsToggle.store (true);
+            else if (r >= 100 && r < 100 + InfiniteBowProcessor::numFactoryPresets)
             {
-                WigaWindowSize::setDefaultIndex (JucePlugin_Name, r - 20);
-                safe->applyScale ((float) sizeHeight (r - 20) / (float) safe->refH);
+                ed.proc.setCurrentProgram (r - 100);
+                ed.proc.updateHostDisplay (AudioProcessorListener::ChangeDetails().withProgramChanged (true));
             }
-            else if (r >= 40 && r < 40 + NineHandsGlow::numSteps)
-            {
-                NineHandsGlow::setPercent (JucePlugin_Name, NineHandsGlow::steps[r - 40]);
-                safe->glow = (float) NineHandsGlow::steps[r - 40] / 100.0f;
-                safe->repaint();
-            }
-            else if (r >= 1000) safe->handleMidiMenu (r);
+            else if (r > 200 && r < 210) { if (ed.proc.loadUserPreset (r - 200)) ed.flash ("User " + String (r - 200), 1.5); }
+            else if (r > 300 && r < 310) { if (ed.proc.saveUserPreset (r - 300)) ed.flash ("Saved  User " + String (r - 300), 1.5); }
+            else if (r >= 1000) ed.handleMidiMenu (r);
+            ed.repaint();
         });
 }
 

@@ -5,6 +5,7 @@
 #include "PluginProcessor.h"
 #include "WindowMinSize.h"
 #include "NineHandsMenu.h"
+#include "NineHandsWindow.h"
 
 //==============================================================================
 //  ARC v3 (NINE HANDS | DSP) - format double, d'apres design/Arc_Mockup_v003.svg
@@ -77,6 +78,9 @@ private:
     // ------------------------------------------------------------- menus, MIDI Learn, taille
     void showContextMenu (juce::Point<float> u);
     void showPresetMenu();
+public:
+    juce::PopupMenu buildContextMenu (int learnIdx = -1);   // menu clic droit (aussi pour l'outil de controle des menus)
+private:
     void handleMidiMenu (int r);
     int learnIndexFor (const Hit& h) const;
     void applyScale (float s);

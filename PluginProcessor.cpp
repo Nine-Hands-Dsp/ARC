@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "NineHandsFolder.h"
 #include "PluginEditor.h"
 
 //==============================================================================
@@ -446,6 +447,7 @@ void InfiniteBowProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     auto state = apvts.copyState();
     state.setProperty ("preset", currentPreset.load(), nullptr);
+    state.setProperty ("uiSize", uiSizeIdx.load(), nullptr);
     if (uiScale.load() > 0.0f)
         state.setProperty ("uiScale", uiScale.load(), nullptr);   // taille propre à cette instance
     else
@@ -464,8 +466,19 @@ void InfiniteBowProcessor::setStateInformation (const void* data, int sizeInByte
         if (xml->hasTagName (apvts.state.getType()))
         {
             auto state = juce::ValueTree::fromXml (*xml);
-            currentPreset.store (juce::jlimit (0, numFactoryPresets - 1, (int) state.getProperty ("preset", 0)));
-            uiScale.store ((float) (double) state.getProperty ("uiScale", -1.0));   // absente : taille par défaut choisie
+            {
+                const int pr = (int) state.getProperty ("preset", 0);
+                currentPreset.store (pr > 100 && pr <= 109 ? pr : juce::jlimit (0, numFactoryPresets - 1, pr));
+            }
+            uiScale.store ((float) (double) state.getProperty ("uiScale", -1.0));   // ancien format
+            {
+                // v3.2 : taille du menu ; projet plus ancien : sa taille si c'est une des trois tailles du menu (495 / 557 / 743)
+                int idx = -1;
+                const int hs[3] = { 495, 557, 743 };
+                const int h = juce::roundToInt (uiScale.load() * 743.0f);
+                for (int i = 0; i < 3; ++i) if (uiScale.load() > 0.0f && std::abs (h - hs[i]) <= 2) idx = i;
+                uiSizeIdx.store (juce::jlimit (-1, 2, (int) state.getProperty ("uiSize", idx)));
+            }
             // assignations MIDI Learn (ancien projet sans ces propriétés : ancienne table d'usine Hold = CC64, le reste non assigné)
             constexpr int oldFactoryHoldCC = 64;   // table d'usine < 2.7.1
             bool untouched = true;
@@ -490,4 +503,62 @@ juce::AudioProcessorEditor* InfiniteBowProcessor::createEditor()
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new InfiniteBowProcessor();
+}
+
+//==============================================================================
+//  Presets utilisateur (9 emplacements) : tous les reglages du son
+//==============================================================================
+juce::File InfiniteBowProcessor::getUserPresetFile()
+{
+    return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+             .getChildFile (nhd::folderName()).getChildFile ("Arc").getChildFile ("UserPresets.xml");
+}
+
+bool InfiniteBowProcessor::saveUserPreset (int slot)
+{
+    if (slot < 1 || slot > 9) return false;
+    auto file = getUserPresetFile();
+    file.getParentDirectory().createDirectory();
+    std::unique_ptr<juce::XmlElement> root;
+    if (file.existsAsFile()) root = juce::XmlDocument::parse (file);
+    if (root == nullptr || ! root->hasTagName ("UserPresets")) root = std::make_unique<juce::XmlElement> ("UserPresets");
+    for (auto* e = root->getFirstChildElement(); e != nullptr; e = e->getNextElement())
+        if (e->getIntAttribute ("slot") == slot) { root->removeChildElement (e, true); break; }
+    auto* e = root->createNewChildElement ("Preset");
+    e->setAttribute ("slot", slot);
+    for (auto* prm : getParameters())
+        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*> (prm))
+            e->setAttribute (rp->getParameterID(), (double) rp->convertFrom0to1 (rp->getValue()));
+    const bool ok = root->writeTo (file);
+    if (ok) currentPreset = 100 + slot;
+    return ok;
+}
+
+bool InfiniteBowProcessor::loadUserPreset (int slot)
+{
+    const auto file = getUserPresetFile();
+    if (! file.existsAsFile()) return false;
+    auto root = juce::XmlDocument::parse (file);
+    if (root == nullptr) return false;
+    for (auto* e = root->getFirstChildElement(); e != nullptr; e = e->getNextElement())
+        if (e->getIntAttribute ("slot") == slot)
+        {
+            for (auto* prm : getParameters())
+                if (auto* rp = dynamic_cast<juce::RangedAudioParameter*> (prm))
+                    if (e->hasAttribute (rp->getParameterID()))
+                        rp->setValueNotifyingHost (rp->convertTo0to1 ((float) e->getDoubleAttribute (rp->getParameterID())));
+            currentPreset = 100 + slot;
+            return true;
+        }
+    return false;
+}
+
+bool InfiniteBowProcessor::hasUserPreset (int slot) const
+{
+    const auto file = getUserPresetFile();
+    if (! file.existsAsFile()) return false;
+    if (auto root = juce::XmlDocument::parse (file))
+        for (auto* e = root->getFirstChildElement(); e != nullptr; e = e->getNextElement())
+            if (e->getIntAttribute ("slot") == slot) return true;
+    return false;
 }

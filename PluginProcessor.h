@@ -37,7 +37,7 @@ public:
     double getTailLengthSeconds() const override { return 6.0; }
 
     int getNumPrograms() override { return numFactoryPresets; }
-    int getCurrentProgram() override { return currentPreset.load(); }
+    int getCurrentProgram() override { return juce::jlimit (0, numFactoryPresets - 1, currentPreset.load()); }
     void setCurrentProgram (int index) override;
     const juce::String getProgramName (int index) override;
     void changeProgramName (int, const juce::String&) override {}
@@ -62,7 +62,14 @@ public:
     std::atomic<int>   uiMidiVal { 0 };      // et sa valeur 0..127
     std::atomic<bool>  midiHold  { false };  // pédale de sustain (CC64) = Hold
     std::atomic<int>   currentPreset { 0 };
-    std::atomic<float> uiScale { -1.0f };    // taille de l'interface (60/75/100 %) ; -1 = pas encore choisie pour cette instance
+    std::atomic<float> uiScale { -1.0f };    // ancien format (< 3.2), lu pour reprendre la taille des anciens projets
+    std::atomic<int>   uiSizeIdx { -1 };     // v3.2 : taille choisie au menu pour ce projet (0..2), -1 = taille par defaut choisie
+
+    // presets utilisateur (9 emplacements, comme Doorn) : Nine Hands DSP/Arc/UserPresets.xml ; currentPreset = 100 + n
+    bool saveUserPreset (int slot);
+    bool loadUserPreset (int slot);
+    bool hasUserPreset (int slot) const;
+    static juce::File getUserPresetFile();    // taille de l'interface (60/75/100 %) ; -1 = pas encore choisie pour cette instance
 
     // v2.6 MIDI Learn : toutes les commandes de la façade (clic droit sur la commande)
     // Hold a CC64 par défaut (pédale de sustain, comme avant) ; les autres commandes ne sont pas assignées
