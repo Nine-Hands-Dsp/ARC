@@ -4,6 +4,7 @@ Plugin VST3 (Windows / macOS) et AU (macOS) qui simule un archet électronique :
 sustain infini, attaque en « swell » sans médiator, modes harmoniques, position de l'archet sur la corde.
 Dans le DAW, il apparaît sous le nom **Arc**, fabricant **NINE HANDS | DSP**.
 
+v3.1.2 : tailles de fenêtre alignées sur les pédales doubles (60 % / 75 % / 100 %, redimensionnable jusqu'à 150 %).
 v3.1.1 : flux d'archet plus large et plus contrasté, particules contenues dans l'écran.
 v3.1.0 : écran de corde « flux d'archet » (particules de lumière).
 v3.0.0 : pédale entièrement refaite (nouveau boîtier format double, pièces photo, écrans, Glow réglable au clic droit)

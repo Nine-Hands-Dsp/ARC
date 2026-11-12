@@ -77,7 +77,7 @@ InfiniteBowEditor::InfiniteBowEditor (InfiniteBowProcessor& p)
         if (auto* prm = proc.apvts.getParameter (watchIds[i])) lastValues[(size_t) i] = prm->getValue();
 
     // fenetre : hauteur de Ring Think par defaut (« 60 % »), jamais plus petite ; 75 % et 100 % au clic droit
-    minH = sizeHeight (0); maxH = sizeHeight (numSizes - 1);
+    minH = sizeHeight (0); refH = sizeHeight (numSizes - 1); maxH = 1123;   // comme Darkbass : redimensionnable a la main jusqu'a ~150 %
     minW = roundToInt ((float) minH * UW / UH); maxW = roundToInt ((float) maxH * UW / UH);
     setOpaque (true);
     setResizable (true, false);
@@ -91,8 +91,8 @@ InfiniteBowEditor::InfiniteBowEditor (InfiniteBowProcessor& p)
     else
     {
         const int def = WigaWindowSize::defaultIndex (JucePlugin_Name, numSizes);
-        applyScale ((float) sizeHeight (def) / (float) maxH);
-        openScale = (float) sizeHeight (def) / (float) maxH;
+        applyScale ((float) sizeHeight (def) / (float) refH);
+        openScale = (float) sizeHeight (def) / (float) refH;
         proc.uiScale.store (-1.0f);
     }
     rebuildCache();
@@ -118,16 +118,16 @@ void InfiniteBowEditor::settleForCapture()
 
 int InfiniteBowEditor::sizeHeight (int idx)
 {
-    const int h[numSizes] = { 495, 619, 743 };                     // « 60 % » (= Ring Think), 75 %, 100 %
+    const int h[numSizes] = { 495, 557, 743 };                     // « 60 % » (= Ring Think), 75 %, 100 %
     return h[jlimit (0, numSizes - 1, idx)];
 }
 
 void InfiniteBowEditor::applyScale (float s)
 {
-    s = jlimit ((float) minH / (float) maxH, 1.0f, s);
+    s = jlimit ((float) minH / (float) refH, (float) maxH / (float) refH, s);
     openScale = -1.0f;
     proc.uiScale.store (s);
-    const int h = roundToInt ((float) maxH * s);
+    const int h = roundToInt ((float) refH * s);
     setSize (roundToInt ((float) h * UW / UH), h);
     minSize.enforceNow();
 }
@@ -135,9 +135,9 @@ void InfiniteBowEditor::applyScale (float s)
 void InfiniteBowEditor::resized()
 {
     resizeSettle = 4;                                     // anti-gel v2 : le cache du fond est refait par le timer
-    const float s = (float) getHeight() / (float) maxH;
+    const float s = (float) getHeight() / (float) refH;
     if (getHeight() >= minH - 2 && ! (proc.uiScale.load() < 0.0f && std::abs (s - openScale) < 0.005f))
-        proc.uiScale.store (jlimit ((float) minH / (float) maxH, 1.0f, s));
+        proc.uiScale.store (jlimit ((float) minH / (float) refH, (float) maxH / (float) refH, s));
 }
 
 //==============================================================================
@@ -892,11 +892,11 @@ void InfiniteBowEditor::showContextMenu (Point<float> u)
         [safe = Component::SafePointer<InfiniteBowEditor> (this)] (int r)
         {
             if (safe == nullptr || r <= 0 || r == 9001) return;
-            if (r <= numSizes) safe->applyScale ((float) sizeHeight (r - 1) / (float) safe->maxH);
+            if (r <= numSizes) safe->applyScale ((float) sizeHeight (r - 1) / (float) safe->refH);
             else if (r >= 20 && r < 20 + numSizes)
             {
                 WigaWindowSize::setDefaultIndex (JucePlugin_Name, r - 20);
-                safe->applyScale ((float) sizeHeight (r - 20) / (float) safe->maxH);
+                safe->applyScale ((float) sizeHeight (r - 20) / (float) safe->refH);
             }
             else if (r >= 40 && r < 40 + NineHandsGlow::numSteps)
             {

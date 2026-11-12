@@ -103,7 +103,7 @@ private:
     juce::Typeface::Ptr poppinsMed, poppinsReg, poppinsBold;
     NineHandsMenu::MenuLnf menuLnf;
     wiga::WindowMinSize minSize;
-    int minW = 0, minH = 0, maxW = 0, maxH = 0;
+    int minW = 0, minH = 0, maxW = 0, maxH = 0, refH = 743;   // refH = « 100 % »
 
     // ------------------------------------------------------------- etat affiche
     bool layerB = false;
